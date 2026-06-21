@@ -1,82 +1,37 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-import { provideVSCodeDesignSystem, vsCodeDropdown, vsCodeTextArea, vsCodeOption, vsCodeTextField } from "@vscode/webview-ui-toolkit";
-import { TextArea, Dropdown, TextField } from "@vscode/webview-ui-toolkit";
-import { UpdateEntryMessage } from "./webviewMessageTypes";
+import { provideVSCodeDesignSystem, vsCodeCheckbox, vsCodeDropdown, vsCodeOption, vsCodeTextArea, vsCodeTextField } from "@vscode/webview-ui-toolkit";
+import { Checkbox, Dropdown, TextArea, TextField } from "@vscode/webview-ui-toolkit";
 
-// In order to use all the Webview UI Toolkit web components they
-// must be registered with the browser (i.e. webview) using the
-// syntax below.
-// provideVSCodeDesignSystem().register(allComponents);
-provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeTextArea(), vsCodeOption(), vsCodeTextField());
+import type { DetailValue } from "../types";
+import type { FindingSchema, FindingSchemaField } from "../findingSchema/types";
+import type { SetFindingDetailsMessage, UpdateEntryMessage } from "./webviewMessageTypes";
+
+provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption(), vsCodeTextArea(), vsCodeTextField());
 
 const vscode = acquireVsCodeApi();
+let currentDetails: Record<string, DetailValue | undefined> = {};
+let currentSchema: FindingSchema = { fields: [] };
 
-// Just like a regular webpage we need to wait for the webview
-// DOM to load before we can reference any of the HTML elements
-// or toolkit components
 window.addEventListener("load", () => {
     main();
-    // Notify the extension that the webview is ready
     vscode.postMessage({ command: "webview-ready" });
 });
 
+/**
+ * Initializes the Finding Details webview message listener.
+ */
 function main(): void {
-    const titleField = document.getElementById("label-area") as TextField;
-    titleField?.addEventListener("change", handlePersistentFieldChange);
-
-    const severityDropdown = document.getElementById("severity-dropdown") as Dropdown;
-    severityDropdown?.addEventListener("change", (e: Event) => {
-        handlePersistentFieldChange(e);
-        updateFieldVisibility(severityDropdown.value);
-    });
-
-    const difficultyDropdown = document.getElementById("difficulty-dropdown") as Dropdown;
-    difficultyDropdown?.addEventListener("change", handlePersistentFieldChange);
-
-    const typeDropdown = document.getElementById("type-dropdown") as Dropdown;
-    typeDropdown?.addEventListener("change", handlePersistentFieldChange);
-
-    // for the text areas, we listen to to both the change and input events
-    // on change events we persist the data into disk
-    // on input events we just update the data in memory
-    // this is to avoid writing to disk on every keystroke
-    // and to keep the state updated in case we open a gh issue before the change event fires
-    const descriptionArea = document.getElementById("description-area") as TextArea;
-    descriptionArea?.addEventListener("change", handlePersistentFieldChange);
-    descriptionArea?.addEventListener("input", handleNonPersistentFieldChange);
-
-    const exploitArea = document.getElementById("exploit-area") as TextArea;
-    exploitArea?.addEventListener("change", handlePersistentFieldChange);
-    exploitArea?.addEventListener("input", handleNonPersistentFieldChange);
-
-    const recommendationArea = document.getElementById("recommendation-area") as TextArea;
-    recommendationArea?.addEventListener("change", handlePersistentFieldChange);
-    recommendationArea?.addEventListener("input", handleNonPersistentFieldChange);
-
-    // container div with all the elements
     const containerDiv = document.getElementById("container-div") as HTMLDivElement;
-
-    // start with the container hidden
     containerDiv.style.display = "none";
 
-    // handle the message inside the webview
     window.addEventListener("message", (event) => {
         const message = event.data;
 
         switch (message.command) {
             case "set-finding-details":
+                renderFindingDetails(message as SetFindingDetailsMessage);
                 containerDiv.style.display = "block";
-                titleField.value = message.title;
-                severityDropdown.value = message.severity;
-                difficultyDropdown.value = message.difficulty;
-                typeDropdown.value = message.type;
-
-                descriptionArea.value = message.description;
-                exploitArea.value = message.exploit;
-                recommendationArea.value = message.recommendation;
-                updateFieldVisibility(message.severity as string);
                 break;
-
             case "hide-finding-details":
                 containerDiv.style.display = "none";
                 break;
@@ -84,42 +39,213 @@ function main(): void {
     });
 }
 
+/**
+ * Renders fields from the configured finding schema.
+ */
+function renderFindingDetails(message: SetFindingDetailsMessage): void {
+    currentDetails = { ...message.details, title: message.title };
+    currentSchema = message.schema;
+
+    const fieldsContainer = document.getElementById("fields-container") as HTMLDivElement;
+    fieldsContainer.replaceChildren();
+
+    for (const field of currentSchema.fields) {
+        fieldsContainer.appendChild(createFieldRow(field));
+    }
+    updateAllFieldVisibility();
+}
+
+/**
+ * Creates a labeled field row for a schema field.
+ */
+function createFieldRow(field: FindingSchemaField): HTMLDivElement {
+    const row = document.createElement("div");
+    row.className = "detailsDiv";
+    row.dataset.fieldKey = field.key;
+
+    if (field.type === "textarea") {
+        row.appendChild(createTextArea(field));
+        return row;
+    }
+
+    const label = document.createElement("span");
+    label.className = "detailSpan";
+    label.textContent = `${field.label}:`;
+    row.appendChild(label);
+    row.appendChild(createFieldControl(field));
+    return row;
+}
+
+/**
+ * Creates the correct input control for a schema field.
+ */
+function createFieldControl(field: FindingSchemaField): HTMLElement {
+    switch (field.type) {
+        case "select":
+            return createDropdown(field);
+        case "checkbox":
+            return createCheckbox(field);
+        case "number":
+        case "text":
+            return createTextField(field);
+        case "textarea":
+            return createTextArea(field);
+    }
+}
+
+/**
+ * Creates a text input field.
+ */
+function createTextField(field: FindingSchemaField): TextField {
+    const element = document.createElement("vscode-text-field") as TextField;
+    element.id = field.key;
+    element.value = stringifyDetailValue(currentDetails[field.key]);
+    if (field.placeholder !== undefined) {
+        element.placeholder = field.placeholder;
+    }
+    if (field.type === "number") {
+        element.setAttribute("type", "number");
+    }
+    element.addEventListener("change", handlePersistentFieldChange);
+    return element;
+}
+
+/**
+ * Creates a multiline textarea field.
+ */
+function createTextArea(field: FindingSchemaField): TextArea {
+    const element = document.createElement("vscode-text-area") as TextArea;
+    element.id = field.key;
+    element.textContent = field.label;
+    element.value = stringifyDetailValue(currentDetails[field.key]);
+    if (field.placeholder !== undefined) {
+        element.placeholder = field.placeholder;
+    }
+    if (field.rows !== undefined) {
+        element.rows = field.rows;
+    }
+    element.addEventListener("change", handlePersistentFieldChange);
+    element.addEventListener("input", handleNonPersistentFieldChange);
+    return element;
+}
+
+/**
+ * Creates a dropdown field.
+ */
+function createDropdown(field: FindingSchemaField): Dropdown {
+    const element = document.createElement("vscode-dropdown") as Dropdown;
+    element.id = field.key;
+    element.setAttribute("position", "below");
+    for (const option of field.options ?? []) {
+        const optionElement = document.createElement("vscode-option");
+        optionElement.textContent = option;
+        element.appendChild(optionElement);
+    }
+    element.value = stringifyDetailValue(currentDetails[field.key]);
+    element.addEventListener("change", (event) => {
+        handlePersistentFieldChange(event);
+        updateAllFieldVisibility();
+    });
+    return element;
+}
+
+/**
+ * Creates a checkbox field.
+ */
+function createCheckbox(field: FindingSchemaField): Checkbox {
+    const element = document.createElement("vscode-checkbox") as Checkbox;
+    element.id = field.key;
+    element.textContent = field.label;
+    element.checked = currentDetails[field.key] === true;
+    element.addEventListener("change", handlePersistentFieldChange);
+    return element;
+}
+
+/**
+ * Handles non-persistent input changes for text areas.
+ */
 function handleNonPersistentFieldChange(e: Event): void {
     handleFieldChange(e, false);
 }
 
+/**
+ * Handles persistent field changes.
+ */
 function handlePersistentFieldChange(e: Event): void {
     handleFieldChange(e, true);
 }
 
+/**
+ * Sends a field update message to the extension host.
+ */
 function handleFieldChange(e: Event, isPersistent: boolean): void {
     const element = e.target as HTMLInputElement;
-    const value = element.value;
-    const field = element.id.split("-")[0];
+    const field = element.id;
+    const schemaField = currentSchema.fields.find((item) => item.key === field);
+    const value = getElementValue(element, schemaField);
+    currentDetails[field] = value;
 
     const message: UpdateEntryMessage = {
         command: "update-entry",
-        field: field,
-        value: value,
-        isPersistent: isPersistent,
+        field,
+        value,
+        isPersistent,
     };
     vscode.postMessage(message);
 }
 
-const CODE_QUALITY_SEVERITY = "Code Quality";
+/**
+ * Gets a typed value from a rendered field element.
+ */
+function getElementValue(element: HTMLInputElement, field: FindingSchemaField | undefined): DetailValue {
+    if (field?.type === "checkbox") {
+        return Boolean((element as unknown as Checkbox).checked);
+    }
+    if (field?.type === "number") {
+        const value = element.value;
+        return value === "" ? null : Number(value);
+    }
+    return element.value;
+}
 
 /**
- * Shows or hides detail fields based on whether the finding severity is "Code Quality".
- * Code Quality findings only show title, severity, and description.
+ * Updates conditional visibility for every rendered field.
  */
-function updateFieldVisibility(severity: string): void {
-    const isCodeQuality = severity === CODE_QUALITY_SEVERITY;
-    const hiddenIds = ["difficulty-dropdown", "type-dropdown", "exploit-area", "recommendation-area"];
-    for (const id of hiddenIds) {
-        const element = document.getElementById(id);
-        const parentDiv = element?.parentElement;
-        if (parentDiv) {
-            parentDiv.style.display = isCodeQuality ? "none" : "";
+function updateAllFieldVisibility(): void {
+    for (const field of currentSchema.fields) {
+        const row = document.querySelector<HTMLDivElement>(`[data-field-key="${field.key}"]`);
+        if (row !== null) {
+            row.style.display = isFieldVisible(field) ? "" : "none";
         }
     }
+}
+
+/**
+ * Returns whether a field should be visible for the current detail values.
+ */
+function isFieldVisible(field: FindingSchemaField): boolean {
+    if (field.visibleWhen === undefined) {
+        return true;
+    }
+    const actual = currentDetails[field.visibleWhen.field];
+    if (field.visibleWhen.equals !== undefined && actual !== field.visibleWhen.equals) {
+        return false;
+    }
+    if (field.visibleWhen.notEquals !== undefined && actual === field.visibleWhen.notEquals) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Converts detail values into input-friendly strings.
+ */
+function stringifyDetailValue(value: DetailValue | undefined): string {
+    if (value === undefined || value === null) {
+        return "";
+    }
+    if (Array.isArray(value)) {
+        return value.join(", ");
+    }
+    return String(value);
 }

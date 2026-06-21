@@ -160,6 +160,10 @@ Run `weAudit: Initialize Project Config` from the Command Palette to create `.vs
 
 When `.vscode/info.json` is present and valid, permalink commands resolve repository remotes and commits from the matching repository/version in that file. Locations are matched by explicit `repo`/`version` metadata when available, otherwise by the longest repository `root` prefix.
 
+### Finding Schema
+
+The Finding Details panel renders fixed `title`, `severity`, and `description` fields plus any additional fields configured in `weAudit.findingSchema.fields`. Dynamic fields support `text`, `textarea`, `select`, `checkbox`, and `number` controls, with optional `visibleWhen` rules for conditionally showing fields based on other detail values.
+
 ### Hide Findings
 You can hide all findings associated with a specific user by clicking on that user's name on the  `weAudit Files` panel.
 

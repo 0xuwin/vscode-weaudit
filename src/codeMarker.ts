@@ -27,13 +27,11 @@ import {
     createDefaultEntryDetails,
     createLocationEntry,
     isPathOrganizerEntry,
-    FindingDifficulty,
     FindingSeverity,
-    FindingType,
-    isEnumValue,
     EntryType,
     RemoteAndPermalink,
     AUDIT_STATE_SCHEMA_VERSION,
+    DetailValue,
     createPathOrganizer,
     getEntryIndexFromArray,
     treeViewModeLabel,
@@ -1871,7 +1869,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         });
 
-        vscode.commands.registerCommand("weAudit.updateCurrentSelectedEntry", (field: string, value: string, isPersistent: boolean) => {
+        vscode.commands.registerCommand("weAudit.updateCurrentSelectedEntry", (field: string, value: DetailValue, isPersistent: boolean) => {
             this.updateCurrentlySelectedEntry(field, value, isPersistent);
         });
 
@@ -2185,7 +2183,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
     }
 
-    updateCurrentlySelectedEntry(field: string, value: string, isPersistent: boolean): void {
+    updateCurrentlySelectedEntry(field: string, value: DetailValue, isPersistent: boolean): void {
         if (treeView.selection.length === 0) {
             return;
         }
@@ -2202,35 +2200,29 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entry = entry.parentEntry;
         }
 
-        // TODO: determine how to update the entry from the field string
         switch (field) {
-            case "severity":
-                entry.details.severity = isEnumValue(FindingSeverity, value) ? value : FindingSeverity.Undefined;
-                break;
-            case "difficulty":
-                entry.details.difficulty = isEnumValue(FindingDifficulty, value) ? value : FindingDifficulty.Undefined;
-                break;
-            case "type":
-                entry.details.type = isEnumValue(FindingType, value) ? value : FindingType.Undefined;
-                break;
-            case "description":
-                entry.details.description = value;
-                break;
-            case "exploit":
-                entry.details.exploit = value;
-                break;
-            case "recommendation":
-                entry.details.recommendation = value;
-                break;
+            case "title":
             case "label": {
-                entry.label = value;
-                entry.details.title = value;
+                const title = String(value ?? "");
+                entry.label = title;
+                entry.details.title = title;
                 this.refreshTree();
                 this.refreshAndDecorateEntry(entry);
                 treeView.reveal(entry);
                 break;
             }
+            default:
+                entry.details[field] = value;
+                break;
         }
+
+        if (field === "severity") {
+            entry.details.severity = String(value ?? "");
+        }
+        if (field === "description") {
+            entry.details.description = String(value ?? "");
+        }
+
         if (isPersistent) {
             void this.updateSavedData(entry.author);
         }

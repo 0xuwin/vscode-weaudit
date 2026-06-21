@@ -5,6 +5,7 @@ import { getUri } from "../utilities/getUri";
 import { EntryDetails } from "../types";
 import { WebviewMessage } from "../webview/webviewMessageTypes";
 import htmlBody from "./findingDetails.html";
+import { loadFindingSchema } from "../findingSchema/settings";
 
 export function activateFindingDetailsWebview(context: vscode.ExtensionContext): void {
     const provider = new FindingDetailsProvider(context.extensionUri);
@@ -62,12 +63,8 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         if (this._view) {
             this._view.webview.postMessage({
                 command: "set-finding-details",
-                severity: entry.severity,
-                difficulty: entry.difficulty,
-                type: entry.type,
-                description: entry.description,
-                exploit: entry.exploit,
-                recommendation: entry.recommendation,
+                details: { ...entry, title },
+                schema: loadFindingSchema(),
                 title: title,
             });
 

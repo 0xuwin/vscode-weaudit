@@ -1,9 +1,25 @@
-export type WebviewMessage = UpdateEntryMessage | UpdateRepositoryMessage | WebviewIsReadyMessage | ChooseWorkspaceRootMessage | SetWorkspaceRootsMessage;
+import type { DetailValue } from "../types";
+import type { FindingSchema } from "../findingSchema/types";
+
+export type WebviewMessage =
+    | UpdateEntryMessage
+    | UpdateRepositoryMessage
+    | WebviewIsReadyMessage
+    | ChooseWorkspaceRootMessage
+    | SetWorkspaceRootsMessage
+    | SetFindingDetailsMessage;
+
+export interface SetFindingDetailsMessage {
+    command: "set-finding-details";
+    title: string;
+    details: Record<string, DetailValue | undefined>;
+    schema: FindingSchema;
+}
 
 export interface UpdateEntryMessage {
     command: "update-entry";
     field: string;
-    value: string;
+    value: DetailValue;
     isPersistent: boolean;
 }
 

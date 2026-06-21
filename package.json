@@ -618,6 +618,128 @@
                         "type": "boolean",
                         "default": false,
                         "description": "Skip the confirmation dialog when opening a Code Quality comment. The comment will be copied to clipboard and the issue opened immediately."
+                    },
+                    "weAudit.findingSchema.fields": {
+                        "type": "array",
+                        "description": "Additional finding detail fields rendered after title, severity, and description.",
+                        "default": [
+                            {
+                                "key": "difficulty",
+                                "label": "Difficulty",
+                                "type": "select",
+                                "options": [
+                                    "",
+                                    "Undetermined",
+                                    "Not Applicable",
+                                    "Low",
+                                    "Medium",
+                                    "High"
+                                ],
+                                "visibleWhen": {
+                                    "field": "severity",
+                                    "notEquals": "Code Quality"
+                                }
+                            },
+                            {
+                                "key": "type",
+                                "label": "Type",
+                                "type": "select",
+                                "options": [
+                                    "",
+                                    "Access Controls",
+                                    "Auditing and Logging",
+                                    "Authentication",
+                                    "Configuration",
+                                    "Cryptography",
+                                    "Data Exposure",
+                                    "Data Validation",
+                                    "Denial of Service",
+                                    "Error Reporting",
+                                    "Patching",
+                                    "Session Management",
+                                    "Testing",
+                                    "Timing",
+                                    "Undefined Behavior"
+                                ],
+                                "visibleWhen": {
+                                    "field": "severity",
+                                    "notEquals": "Code Quality"
+                                }
+                            },
+                            {
+                                "key": "exploit",
+                                "label": "Exploit Scenario",
+                                "type": "textarea",
+                                "placeholder": "The exploit scenario",
+                                "rows": 5,
+                                "visibleWhen": {
+                                    "field": "severity",
+                                    "notEquals": "Code Quality"
+                                }
+                            },
+                            {
+                                "key": "recommendation",
+                                "label": "Recommendations",
+                                "type": "textarea",
+                                "rows": 5,
+                                "visibleWhen": {
+                                    "field": "severity",
+                                    "notEquals": "Code Quality"
+                                }
+                            }
+                        ],
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "key",
+                                "label",
+                                "type"
+                            ],
+                            "properties": {
+                                "key": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+                                },
+                                "label": {
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "text",
+                                        "textarea",
+                                        "select",
+                                        "checkbox",
+                                        "number"
+                                    ]
+                                },
+                                "required": {
+                                    "type": "boolean"
+                                },
+                                "options": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "placeholder": {
+                                    "type": "string"
+                                },
+                                "rows": {
+                                    "type": "number"
+                                },
+                                "visibleWhen": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field": {
+                                            "type": "string"
+                                        },
+                                        "equals": {},
+                                        "notEquals": {}
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
