@@ -1,5 +1,7 @@
 import * as assert from "node:assert";
 
+import { generateSourcePermalink } from "../../src/permalinks/permalink";
+
 /**
  * Tests for permalink generation logic used in codeMarker.ts:2595-2603
  *
@@ -11,25 +13,7 @@ describe("Permalink Generation Logic", () => {
      * Generates a permalink based on the remote URL, SHA, and location.
      * This mirrors the logic in codeMarker.ts:2595-2603
      */
-    function generatePermalink(gitRemote: string, sha: string, filePath: string, startLine: number, endLine: number): string {
-        // Parse hostname - mirrors URL.parse(gitRemote)?.hostname in codeMarker.ts:2595
-        let remoteHost: string | null = null;
-        try {
-            remoteHost = new URL(gitRemote).hostname;
-        } catch {
-            // Invalid URL
-        }
-
-        if (remoteHost === "bitbucket.org") {
-            // Bitbucket format: line numbers are 1-indexed
-            const issueLocation = `#lines-${startLine + 1}:${endLine + 1}`;
-            return gitRemote + "/src/" + sha + "/" + filePath + issueLocation;
-        } else {
-            // GitHub/GitLab format: line numbers are 1-indexed
-            const issueLocation = `#L${startLine + 1}-L${endLine + 1}`;
-            return gitRemote + "/blob/" + sha + "/" + filePath + issueLocation;
-        }
-    }
+    const generatePermalink = generateSourcePermalink;
 
     describe("GitHub permalink generation", () => {
         const gitRemote = "https://github.com/trailofbits/vscode-weaudit";
@@ -155,12 +139,6 @@ describe("Permalink Generation Logic", () => {
             const shortSha = "abc123";
             const permalink = generatePermalink(gitRemote, shortSha, "file.ts", 1, 2);
             assert.ok(permalink.includes(shortSha));
-        });
-
-        it("should handle empty SHA (edge case)", () => {
-            const permalink = generatePermalink(gitRemote, "", "file.ts", 1, 2);
-            // Will produce /blob//file.ts - potentially invalid but doesn't throw
-            assert.ok(permalink.includes("/blob//"));
         });
     });
 

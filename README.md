@@ -158,6 +158,8 @@ Project-level metadata can be stored in `.vscode/info.json`. This JSON file is i
 
 Run `weAudit: Initialize Project Config` from the Command Palette to create `.vscode/info.json` for the current workspace. Run `weAudit: Validate Project Config` to check that the file has the expected schema, unique repository names, workspace-relative repository roots, and unique version names within each repository.
 
+When `.vscode/info.json` is present and valid, permalink commands resolve repository remotes and commits from the matching repository/version in that file. Locations are matched by explicit `repo`/`version` metadata when available, otherwise by the longest repository `root` prefix.
+
 ### Hide Findings
 You can hide all findings associated with a specific user by clicking on that user's name on the  `weAudit Files` panel.
 

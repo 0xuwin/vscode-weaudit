@@ -6,6 +6,7 @@ import { expect } from "chai";
 import { getProjectConfigPath, readProjectConfig, writeProjectConfig } from "../../src/projectConfig/storage";
 import { PROJECT_CONFIG_SCHEMA_VERSION, ProjectConfig } from "../../src/projectConfig/types";
 import { isValidProjectConfig, validateProjectConfig } from "../../src/projectConfig/validation";
+import { resolveProjectRepository } from "../../src/projectConfig/resolution";
 
 /**
  * Creates a valid project config for validation tests.
@@ -125,6 +126,65 @@ describe("projectConfig", () => {
             expect(isValidProjectConfig(result)).to.equal(true);
             expect(result.warnings.map((warning) => warning.path)).to.include("project.client");
             expect(result.warnings.map((warning) => warning.path)).to.include("project.target");
+        });
+    });
+
+    describe("resolution", () => {
+        it("resolves repositories with the longest root-prefix match", () => {
+            const config = createValidProjectConfig();
+            config.repositories.push({ name: "root", root: ".", remote: "https://github.com/example/root", versions: [{ name: "Current", commit: "root" }] });
+
+            const resolved = resolveProjectRepository(config, {
+                path: "packages/core/contracts/Token.sol",
+                startLine: 1,
+                endLine: 2,
+                label: "",
+            });
+
+            expect(resolved?.repository.name).to.equal("core");
+            expect(resolved?.path).to.equal("contracts/Token.sol");
+            expect(resolved?.commit).to.equal("abc123");
+        });
+
+        it("honors explicit repository and version hints on locations", () => {
+            const config = createValidProjectConfig();
+            const resolved = resolveProjectRepository(config, {
+                path: "packages/core/contracts/Token.sol",
+                startLine: 1,
+                endLine: 2,
+                label: "",
+                repo: "core",
+                version: "Version 1",
+            });
+
+            expect(resolved?.repository.name).to.equal("core");
+            expect(resolved?.version?.name).to.equal("Version 1");
+            expect(resolved?.commit).to.equal("def456");
+        });
+
+        it("lets location commit override the configured version commit", () => {
+            const config = createValidProjectConfig();
+            const resolved = resolveProjectRepository(config, {
+                path: "packages/core/contracts/Token.sol",
+                startLine: 1,
+                endLine: 2,
+                label: "",
+                commit: "override",
+            });
+
+            expect(resolved?.commit).to.equal("override");
+        });
+
+        it("returns undefined when no repository matches", () => {
+            const config = createValidProjectConfig();
+            const resolved = resolveProjectRepository(config, {
+                path: "packages/other/contracts/Token.sol",
+                startLine: 1,
+                endLine: 2,
+                label: "",
+            });
+
+            expect(resolved).to.equal(undefined);
         });
     });
 });

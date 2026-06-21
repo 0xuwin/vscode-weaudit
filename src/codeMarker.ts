@@ -49,6 +49,10 @@ import {
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
 import { readAuditState, writeAuditState } from "./auditState/storage";
+import { generateSourcePermalink } from "./permalinks/permalink";
+import { resolveProjectRepository } from "./projectConfig/resolution";
+import { getProjectConfigPath, readProjectConfig } from "./projectConfig/storage";
+import { isValidProjectConfig, validateProjectConfig } from "./projectConfig/validation";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
@@ -2030,7 +2034,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         let markdown = "";
         for (const entry of selectedEntries) {
-            let entryMarkdown = await this.getEntryMarkdown(entry.entry);
+            let entryMarkdown = this.getEntryMarkdown(entry.entry);
             if (entryMarkdown === undefined) {
                 entryMarkdown = "";
             }
@@ -2054,7 +2058,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         await vscode.commands.executeCommand("list.find");
     }
 
-    async getSelectedClientCodeAndPermalink(): Promise<FromLocationResponse | void> {
+    getSelectedClientCodeAndPermalink(): FromLocationResponse | void {
         const locations = this.getActiveSelectionLocation();
         if (locations === undefined || locations.length === 0) {
             return;
@@ -2064,7 +2068,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const location = locations[0];
         const editor = vscode.window.activeTextEditor!;
 
-        const remoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
+        const remoteAndPermalink = this.getRemoteAndPermalink(location);
         if (remoteAndPermalink === undefined) {
             return;
         }
@@ -2080,7 +2084,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     async getCodeToCopyFromLocation(entry: FullEntry | FullLocationEntry): Promise<FromLocationResponse | void> {
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
-        const permalink = await this.getClientPermalink(location);
+        const permalink = this.getClientPermalink(location);
         if (permalink === undefined) {
             return;
         }
@@ -2480,17 +2484,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     /**
      * Get the git remote and the permalink for the given code region
-     * @param repository If the repository is the Audit repository or the Client repository
      * @param startLine The start line of the code region
      * @param endLine The end line of the code region
      * @param path The path of the file
      * @returns The git remote and the permalink, or undefined if either could not be found
      */
-    async getRemoteAndPermalink(repository: Repository, location: FullLocation): Promise<RemoteAndPermalink | undefined> {
-        let gitRemote;
-
-        // Since git configuration is managed per workspace root, use the MultiRootManager
-        // to get the corresponding WARoot and get the link from there
+    getRemoteAndPermalink(location: FullLocation): RemoteAndPermalink | undefined {
         const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(location.rootPath);
 
         if (wsRoot === undefined) {
@@ -2498,56 +2497,58 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        switch (repository) {
-            case Repository.Audit:
-                gitRemote = await wsRoot.findGitRemote();
-                break;
-            case Repository.Client:
-                gitRemote = await wsRoot.findClientRemote();
-                break;
-        }
+        return this.getProjectConfigRemoteAndPermalink(wsRoot.rootPath, location);
+    }
 
-        if (!gitRemote) {
-            vscode.window
-                .showErrorMessage(`Could not determine the ${repository} Repository URL.`, `Configure ${repository} URL for the corresponding workspace root`)
-                .then((config) => {
-                    if (config === undefined) {
-                        return;
-                    }
-                    switch (repository) {
-                        case Repository.Audit:
-                            void wsRoot.editAuditRemote();
-                            break;
-                        case Repository.Client:
-                            void wsRoot.editClientRemote();
-                            break;
-                    }
-                });
+    /**
+     * Resolves a permalink from .vscode/info.json when project config is available.
+     */
+    private getProjectConfigRemoteAndPermalink(workspaceRoot: string, location: FullLocation): RemoteAndPermalink | undefined {
+        const projectConfigPath = getProjectConfigPath(workspaceRoot);
+        if (!fs.existsSync(projectConfigPath)) {
+            vscode.window.showErrorMessage("weAudit: Project config not found at .vscode/info.json. Run 'weAudit: Initialize Project Config' first.");
             return;
         }
 
-        const sha = wsRoot.findGitSha();
-        if (!sha) {
-            vscode.window.showErrorMessage("Could not determine the commit hash.", "Configure Commit Hash of the workspace root").then((config) => {
-                if (config === undefined) {
-                    return;
-                }
-                void wsRoot.editGitHash();
-            });
+        let projectConfig;
+        try {
+            projectConfig = readProjectConfig(projectConfigPath);
+        } catch (error) {
+            vscode.window.showErrorMessage(`weAudit: Failed to parse project config: ${String(error)}`);
+            return;
+        }
+        const validationResult = validateProjectConfig(projectConfig, workspaceRoot);
+        if (!isValidProjectConfig(validationResult)) {
+            const firstError = validationResult.errors[0];
+            const pathPrefix = firstError.path === undefined ? "" : `${firstError.path}: `;
+            vscode.window.showErrorMessage(`weAudit: Project config is invalid. ${pathPrefix}${firstError.message}`);
             return;
         }
 
-        const remoteHost = URL.parse(gitRemote)?.hostname;
-        let permalink;
-        if (remoteHost === "bitbucket.org") {
-            const issueLocation = `#lines-${location.startLine + 1}:${location.endLine + 1}`;
-            permalink = gitRemote + "/src/" + sha + "/" + location.path + issueLocation;
-        } else {
-            const issueLocation = `#L${location.startLine + 1}-L${location.endLine + 1}`;
-            permalink = gitRemote + "/blob/" + sha + "/" + location.path + issueLocation;
+        const resolvedRepository = resolveProjectRepository(projectConfig, location);
+        if (resolvedRepository === undefined) {
+            vscode.window.showErrorMessage(`weAudit: No repository in .vscode/info.json matches ${location.path}.`);
+            return;
+        }
+        if (resolvedRepository.repository.remote === undefined || resolvedRepository.repository.remote === "") {
+            vscode.window.showErrorMessage(`weAudit: Repository '${resolvedRepository.repository.name}' is missing a remote in .vscode/info.json.`);
+            return;
+        }
+        if (resolvedRepository.commit === undefined || resolvedRepository.commit === "") {
+            vscode.window.showErrorMessage(`weAudit: Repository '${resolvedRepository.repository.name}' has no commit for this location in .vscode/info.json.`);
+            return;
         }
 
-        return { remote: gitRemote, permalink };
+        return {
+            remote: resolvedRepository.repository.remote,
+            permalink: generateSourcePermalink(
+                resolvedRepository.repository.remote,
+                resolvedRepository.commit,
+                resolvedRepository.path,
+                location.startLine,
+                location.endLine,
+            ),
+        };
     }
 
     /**
@@ -2555,8 +2556,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param location The location to get the remote and permalink for
      * @returns The git remote and the permalink, or undefined if either could not be found
      */
-    async getEntryRemoteAndPermalink(location: FullLocation): Promise<RemoteAndPermalink | undefined> {
-        return this.getRemoteAndPermalink(Repository.Audit, location);
+    getEntryRemoteAndPermalink(location: FullLocation): RemoteAndPermalink | undefined {
+        return this.getRemoteAndPermalink(location);
     }
 
     /**
@@ -2566,8 +2567,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param path The path of the file
      * @returns The permalink, or undefined if either could not be found
      */
-    async getClientPermalink(location: FullLocation): Promise<string | undefined> {
-        const remoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
+    getClientPermalink(location: FullLocation): string | undefined {
+        const remoteAndPermalink = this.getRemoteAndPermalink(location);
         if (remoteAndPermalink) {
             return remoteAndPermalink.permalink;
         }
@@ -2577,7 +2578,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Copy a permalink to the currently selected text to the clipboard
      * @param repository If the repository is the Audit repository or the Client repository
      */
-    async copySelectedCodePermalink(repository: Repository): Promise<void> {
+    copySelectedCodePermalink(_repository: Repository): void {
         const locations = this.getActiveSelectionLocation();
         if (locations === undefined || locations.length === 0) {
             return;
@@ -2585,7 +2586,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // Use the first selection
         const location = locations[0];
 
-        const remoteAndPermalink = await this.getRemoteAndPermalink(repository, location);
+        const remoteAndPermalink = this.getRemoteAndPermalink(location);
         if (remoteAndPermalink === undefined) {
             return;
         }
@@ -2596,9 +2597,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Copy the permalink of the given entry to the clipboard
      * @param entry The entry to copy the permalink of
      */
-    async copyEntryPermalink(entry: FullEntry | FullLocationEntry): Promise<void> {
+    copyEntryPermalink(entry: FullEntry | FullLocationEntry): void {
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
-        const remoteAndPermalink = await this.getEntryRemoteAndPermalink(location);
+        const remoteAndPermalink = this.getEntryRemoteAndPermalink(location);
         if (remoteAndPermalink === undefined) {
             return;
         }
@@ -2609,10 +2610,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Copy all permalinks of the given entry to the clipboard
      * @param entry The entry to copy the permalinks of
      */
-    async copyEntryPermalinks(entry: FullEntry): Promise<void> {
+    copyEntryPermalinks(entry: FullEntry): void {
         const permalinkList = [];
         for (const location of entry.locations) {
-            const remoteAndPermalink = await this.getEntryRemoteAndPermalink(location);
+            const remoteAndPermalink = this.getEntryRemoteAndPermalink(location);
             if (remoteAndPermalink === undefined) {
                 return;
             }
@@ -2667,11 +2668,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Open a prefilled github issue for the given entry
      * @param entry The entry to open an issue for
      */
-    async openGithubIssue(entry: FullEntry): Promise<void> {
+    openGithubIssue(entry: FullEntry): void {
         // open github issue with the issue body with the finding text and permalink
         const title = encodeURIComponent(entry.label);
 
-        const issueBodyText = await this.getEntryMarkdown(entry);
+        const issueBodyText = this.getEntryMarkdown(entry);
         if (issueBodyText === undefined) {
             return;
         }
@@ -2737,30 +2738,17 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             });
     }
 
-    private async getEntryMarkdown(entry: FullEntry): Promise<string | void> {
-        const clientPermalinks = [];
+    private getEntryMarkdown(entry: FullEntry): string | void {
         const auditPermalinks = [];
         let locationDescriptions = "";
 
-        let atLeastOneUniqueClientRemote = false;
-
         // Use .entries to iterate over entry.locations
         for (const [i, location] of entry.locations.entries()) {
-            const clientRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
-            const auditRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Audit, location);
-            if (auditRemoteAndPermalink === undefined) {
+            const remoteAndPermalink = this.getRemoteAndPermalink(location);
+            if (remoteAndPermalink === undefined) {
                 return;
             }
-            if (
-                clientRemoteAndPermalink !== undefined &&
-                clientRemoteAndPermalink.remote !== "" &&
-                clientRemoteAndPermalink.remote !== auditRemoteAndPermalink.remote
-            ) {
-                atLeastOneUniqueClientRemote = true;
-            }
-            const clientPermalink = clientRemoteAndPermalink === undefined ? "" : clientRemoteAndPermalink.permalink;
-            clientPermalinks.push(clientPermalink);
-            auditPermalinks.push(auditRemoteAndPermalink.permalink);
+            auditPermalinks.push(remoteAndPermalink.permalink);
 
             // Include location section if there's a label or description
             const locationDescription = location.description ?? "";
@@ -2770,7 +2758,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 if (locationDescription !== "") {
                     locationDescriptions += `${locationDescription}\n\n`;
                 }
-                locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
+                locationDescriptions += `${remoteAndPermalink.permalink}`;
             }
         }
 
@@ -2790,7 +2778,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         const target = Array.from(locationSet).join(", ");
         const permalinks = auditPermalinks.join("\n");
-        const clientPermalinkString = clientPermalinks.join("\n");
         const severity = String(entry.details.severity ?? "");
         const difficulty = String(entry.details.difficulty ?? "");
         const findingType = String(entry.details.type ?? "");
@@ -2808,10 +2795,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         issueBodyText += `## Recommendations\n${recommendation}\n\n\n`;
 
         issueBodyText += `Permalink:\n${permalinks}\n\n`;
-        // TODO: this breaks the finding writer
-        if (clientPermalinkString !== "" && atLeastOneUniqueClientRemote) {
-            issueBodyText += `Client PermaLink:\n${clientPermalinkString}\n`;
-        }
         return issueBodyText;
     }
 
@@ -2821,29 +2804,16 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry The Code Quality finding entry
      * @returns The markdown string or undefined if permalink generation fails
      */
-    private async getCQCommentMarkdown(entry: FullEntry): Promise<string | void> {
-        const clientPermalinks = [];
+    private getCQCommentMarkdown(entry: FullEntry): string | void {
         const auditPermalinks = [];
         let locationDescriptions = "";
 
-        let atLeastOneUniqueClientRemote = false;
-
         for (const [i, location] of entry.locations.entries()) {
-            const clientRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
-            const auditRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Audit, location);
-            if (auditRemoteAndPermalink === undefined) {
+            const remoteAndPermalink = this.getRemoteAndPermalink(location);
+            if (remoteAndPermalink === undefined) {
                 return;
             }
-            if (
-                clientRemoteAndPermalink !== undefined &&
-                clientRemoteAndPermalink.remote !== "" &&
-                clientRemoteAndPermalink.remote !== auditRemoteAndPermalink.remote
-            ) {
-                atLeastOneUniqueClientRemote = true;
-            }
-            const clientPermalink = clientRemoteAndPermalink === undefined ? "" : clientRemoteAndPermalink.permalink;
-            clientPermalinks.push(clientPermalink);
-            auditPermalinks.push(auditRemoteAndPermalink.permalink);
+            auditPermalinks.push(remoteAndPermalink.permalink);
 
             const locationDescription = location.description ?? "";
             if (location.label !== "" || locationDescription !== "") {
@@ -2852,19 +2822,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 if (locationDescription !== "") {
                     locationDescriptions += `${locationDescription}\n\n`;
                 }
-                locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
+                locationDescriptions += `${remoteAndPermalink.permalink}`;
             }
         }
 
         const permalinks = auditPermalinks.join("\n");
-        const clientPermalinkString = clientPermalinks.join("\n");
 
         let bodyText = `### Title\n${entry.label}\n\n`;
         bodyText += `## Description\n${entry.details.description ?? ""}${locationDescriptions}\n\n`;
         bodyText += `Permalink:\n${permalinks}\n\n`;
-        if (clientPermalinkString !== "" && atLeastOneUniqueClientRemote) {
-            bodyText += `Client PermaLink:\n${clientPermalinkString}\n`;
-        }
         return bodyText;
     }
 
@@ -2890,8 +2856,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        // Generate the CQ comment markdown (getRemoteAndPermalink handles missing remote with a config prompt)
-        const commentBody = await this.getCQCommentMarkdown(entry);
+        // Generate the CQ comment markdown using repository facts from .vscode/info.json.
+        const commentBody = this.getCQCommentMarkdown(entry);
         if (commentBody === undefined) {
             return;
         }

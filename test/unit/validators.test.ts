@@ -364,7 +364,7 @@ describe("validateSerializedData", () => {
     });
 
     describe("entryDetails fields", () => {
-        it("accepts entryDetails missing optional legacy fields", () => {
+        it("accepts entryDetails missing optional detail fields", () => {
             const data = createDefaultSerializedData();
             const entry: any = createValidEntry();
             delete entry.details.severity;
