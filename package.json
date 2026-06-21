@@ -276,6 +276,14 @@
             {
                 "command": "weAudit.editCodeQualityIssueNumber",
                 "title": "weAudit: Set Code Quality Issue Number"
+            },
+            {
+                "command": "weAudit.initializeProjectConfig",
+                "title": "weAudit: Initialize Project Config"
+            },
+            {
+                "command": "weAudit.validateProjectConfig",
+                "title": "weAudit: Validate Project Config"
             }
         ],
         "keybindings": [

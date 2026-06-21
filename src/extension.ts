@@ -6,6 +6,7 @@ import { AuditMarker } from "./codeMarker";
 import { MultipleSavedFindings } from "./multiConfigs";
 import { activateFindingDetailsWebview } from "./panels/findingDetailsPanel";
 import { activateGitConfigWebview } from "./panels/gitConfigPanel";
+import { activateProjectConfigCommands } from "./projectConfig/commands";
 
 export function activate(context: vscode.ExtensionContext): void {
     // if there are no open folders, return
@@ -23,6 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
     new MultipleSavedFindings(context);
     activateFindingDetailsWebview(context);
     activateGitConfigWebview(context);
+    activateProjectConfigCommands(context);
 }
 
 async function openResource(resource: vscode.Uri, startLine: number, endLine: number): Promise<void> {

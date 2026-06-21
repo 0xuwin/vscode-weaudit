@@ -152,6 +152,12 @@ There are color settings for other user's findings and notes, and for your own f
 
 ![Multiple Users](media/readme/multi_user.png)
 
+### Project Config
+
+Project-level metadata can be stored in `.vscode/info.json`. This JSON file is intended for shared facts such as client/target metadata, repositories, repository roots, audit scope, and named versions/commits.
+
+Run `weAudit: Initialize Project Config` from the Command Palette to create `.vscode/info.json` for the current workspace. Run `weAudit: Validate Project Config` to check that the file has the expected schema, unique repository names, workspace-relative repository roots, and unique version names within each repository.
+
 ### Hide Findings
 You can hide all findings associated with a specific user by clicking on that user's name on the  `weAudit Files` panel.
 
