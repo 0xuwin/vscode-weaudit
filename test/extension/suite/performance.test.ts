@@ -56,6 +56,7 @@ suite("Performance", () => {
                 entryType: i % 2,
                 author: "testuser",
                 details: {
+                    title: `Test Entry ${i}`,
                     severity: "Undefined",
                     difficulty: "Undefined",
                     type: "Undefined",
@@ -76,13 +77,11 @@ suite("Performance", () => {
         }
 
         const testData = {
+            schemaVersion: 1,
             treeEntries: entries,
             auditedFiles: [],
             partiallyAuditedFiles: [],
             resolvedEntries: [],
-            clientRemote: "",
-            gitRemote: "",
-            gitSha: "",
         };
 
         const vscodeDir = path.join(workspaceFolders[0].uri.fsPath, ".vscode");
@@ -153,6 +152,7 @@ suite("Performance", () => {
                 entryType: i % 2,
                 author: "testuser",
                 details: {
+                    title: `Large Test Entry ${i}`,
                     severity: "Undefined",
                     difficulty: "Undefined",
                     type: "Undefined",
@@ -173,13 +173,11 @@ suite("Performance", () => {
         }
 
         const testData = {
+            schemaVersion: 1,
             treeEntries: entries,
             auditedFiles: [],
             partiallyAuditedFiles: [],
             resolvedEntries: [],
-            clientRemote: "",
-            gitRemote: "",
-            gitSha: "",
         };
 
         const vscodeDir = path.join(workspaceFolders[0].uri.fsPath, ".vscode");

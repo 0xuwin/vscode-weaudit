@@ -77,38 +77,33 @@ export function isEnumValue<T extends Record<string, string>>(enumObj: T, value:
     return valid;
 }
 
+export const AUDIT_STATE_SCHEMA_VERSION = 1;
+
+/** Values supported by flattened finding detail fields. */
+export type DetailValue = string | number | boolean | null | string[];
+
 /**
- * This object is a representation of the codeMarker class without circular references between objects.
+ * This object is a representation of the user-level audit state.
  * This is used to serialize the data with JSON.stringify.
  */
 export interface SerializedData {
-    clientRemote: string;
-    gitRemote: string;
-    gitSha: string;
+    schemaVersion: number;
     treeEntries: Entry[];
     auditedFiles: AuditedFile[];
-    // older versions do not have partiallyAuditedFiles
     partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: Entry[];
-    // optional code quality issue number for the workspace root
-    codeQualityIssueNumber?: number;
 }
 
 /**
- * This object is a representation of the codeMarker class without circular references between objects.
+ * This object is a representation of the user-level audit state.
  * This is used when deserializing the data with JSON.parse.
  */
 export interface FullSerializedData {
-    clientRemote: string;
-    gitRemote: string;
-    gitSha: string;
+    schemaVersion: number;
     treeEntries: FullEntry[];
     auditedFiles: AuditedFile[];
-    // older versions do not have partiallyAuditedFiles
     partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: FullEntry[];
-    // optional code quality issue number for the workspace root
-    codeQualityIssueNumber?: number;
 }
 
 /**
@@ -116,9 +111,7 @@ export interface FullSerializedData {
  */
 export function createDefaultSerializedData(): SerializedData {
     return {
-        clientRemote: "",
-        gitRemote: "",
-        gitSha: "",
+        schemaVersion: AUDIT_STATE_SCHEMA_VERSION,
         treeEntries: [],
         auditedFiles: [],
         partiallyAuditedFiles: [],
@@ -127,8 +120,12 @@ export function createDefaultSerializedData(): SerializedData {
 }
 
 export function validateSerializedData(data: SerializedData): boolean {
-    // ignore clientRemote, gitRemote and gitSha as these are optional
-    if (data.treeEntries === undefined || data.auditedFiles === undefined || data.resolvedEntries === undefined) {
+    if (
+        data.schemaVersion !== AUDIT_STATE_SCHEMA_VERSION ||
+        data.treeEntries === undefined ||
+        data.auditedFiles === undefined ||
+        data.resolvedEntries === undefined
+    ) {
         return false;
     }
     for (const entry of data.treeEntries.concat(data.resolvedEntries)) {
@@ -171,10 +168,14 @@ function validateEntry(entry: Entry): boolean {
             return false;
         }
     }
-    if (!validateEntryDetails(entry.details)) {
+    if (!isPlainObject(entry.details)) {
         return false;
     }
     return true;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function validateAuditedFile(auditedFile: AuditedFile): boolean {
@@ -189,27 +190,14 @@ function validateLocation(location: Location): boolean {
     return location.path !== undefined && location.startLine !== undefined && location.endLine !== undefined && location.label !== undefined;
 }
 
-function validateEntryDetails(entryDetails: EntryDetails): boolean {
-    return (
-        entryDetails.severity !== undefined &&
-        entryDetails.difficulty !== undefined &&
-        entryDetails.type !== undefined &&
-        entryDetails.description !== undefined &&
-        entryDetails.exploit !== undefined &&
-        entryDetails.recommendation !== undefined
-    );
-}
-
 // ====================================================================
 
 // The data used to fill the Finding Details panel
 export interface EntryDetails {
-    severity: FindingSeverity;
-    difficulty: FindingDifficulty;
-    type: FindingType;
-    description: string;
-    exploit: string;
-    recommendation: string;
+    title: string;
+    severity?: string;
+    description?: string;
+    [key: string]: DetailValue | undefined;
 }
 
 /**
@@ -218,10 +206,11 @@ export interface EntryDetails {
  */
 export function createDefaultEntryDetails(): EntryDetails {
     return {
+        title: "",
         severity: FindingSeverity.Undefined,
+        description: "",
         difficulty: FindingDifficulty.Undefined,
         type: FindingType.Undefined,
-        description: "",
         exploit: "",
         recommendation: "Short term, \nLong term, \n",
     };
@@ -251,8 +240,17 @@ export interface Location {
     /** The label of the location */
     label: string;
 
-    /** The description of the location. This is currently used only when externally loading entries */
-    description: string;
+    /** Optional human-readable description for this specific location. */
+    description?: string;
+
+    /** Optional commit associated with this location. */
+    commit?: string;
+
+    /** Optional repository name associated with this location. */
+    repo?: string;
+
+    /** Optional version name associated with this location. */
+    version?: string;
 }
 
 /**

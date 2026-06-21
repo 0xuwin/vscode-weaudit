@@ -12,6 +12,7 @@ import {
     type PathOrganizerEntry,
     type PartiallyAuditedFile,
     type SerializedData,
+    AUDIT_STATE_SCHEMA_VERSION,
     TreeViewMode,
     type WorkspaceRootEntry,
     configEntryEquals,
@@ -36,9 +37,7 @@ describe("types.ts", () => {
         it("should create empty serialized data with all required fields", () => {
             const data = createDefaultSerializedData();
 
-            assert.strictEqual(data.clientRemote, "");
-            assert.strictEqual(data.gitRemote, "");
-            assert.strictEqual(data.gitSha, "");
+            assert.strictEqual(data.schemaVersion, AUDIT_STATE_SCHEMA_VERSION);
             assert.deepStrictEqual(data.treeEntries, []);
             assert.deepStrictEqual(data.auditedFiles, []);
             assert.deepStrictEqual(data.partiallyAuditedFiles, []);
@@ -50,6 +49,7 @@ describe("types.ts", () => {
         it("should create default entry details with undefined enums and empty strings", () => {
             const details = createDefaultEntryDetails();
 
+            assert.strictEqual(details.title, "");
             assert.strictEqual(details.severity, FindingSeverity.Undefined);
             assert.strictEqual(details.difficulty, FindingDifficulty.Undefined);
             assert.strictEqual(details.type, FindingType.Undefined);
@@ -76,6 +76,7 @@ describe("types.ts", () => {
                 entryType: EntryType.Finding,
                 author: "testuser",
                 details: {
+                    title: "Test Finding",
                     severity: FindingSeverity.High,
                     difficulty: FindingDifficulty.Low,
                     type: FindingType.DataValidation,
@@ -97,9 +98,7 @@ describe("types.ts", () => {
 
         function createValidSerializedData(): SerializedData {
             return {
-                clientRemote: "https://github.com/client/repo",
-                gitRemote: "https://github.com/audit/repo",
-                gitSha: "abc123",
+                schemaVersion: AUDIT_STATE_SCHEMA_VERSION,
                 treeEntries: [createValidEntry()],
                 auditedFiles: [{ path: "src/test.ts", author: "testuser" }],
                 partiallyAuditedFiles: [{ path: "src/partial.ts", author: "testuser", startLine: 1, endLine: 50 }],
@@ -159,10 +158,10 @@ describe("types.ts", () => {
             assert.strictEqual(validateSerializedData(data), false);
         });
 
-        it("should return false for entry with invalid details (missing severity)", () => {
+        it("should return true for entry with optional severity missing", () => {
             const data = createValidSerializedData();
             (data.treeEntries[0].details as unknown as { severity: undefined }).severity = undefined;
-            assert.strictEqual(validateSerializedData(data), false);
+            assert.strictEqual(validateSerializedData(data), true);
         });
 
         it("should return false for audited file missing path", () => {
@@ -171,7 +170,7 @@ describe("types.ts", () => {
             assert.strictEqual(validateSerializedData(data), false);
         });
 
-        it("should handle data without partiallyAuditedFiles (backwards compatibility)", () => {
+        it("should handle data without partiallyAuditedFiles", () => {
             const data = createValidSerializedData();
             delete data.partiallyAuditedFiles;
             assert.strictEqual(validateSerializedData(data), true);
@@ -648,13 +647,14 @@ describe("types.ts", () => {
         });
     });
 
-    describe("codeQualityIssueNumber in SerializedData", () => {
+    describe("new SerializedData schema", () => {
         function createValidEntry(): Entry {
             return {
                 label: "Test Finding",
                 entryType: EntryType.Finding,
                 author: "testuser",
                 details: {
+                    title: "Test Finding",
                     severity: FindingSeverity.CodeQuality,
                     difficulty: FindingDifficulty.Low,
                     type: FindingType.Undefined,
@@ -674,43 +674,30 @@ describe("types.ts", () => {
             };
         }
 
-        it("should validate serialized data with codeQualityIssueNumber", () => {
-            const data: SerializedData = {
-                ...createDefaultSerializedData(),
-                treeEntries: [createValidEntry()],
-                codeQualityIssueNumber: 42,
-            };
-            assert.strictEqual(validateSerializedData(data), true);
-        });
-
-        it("should validate serialized data without codeQualityIssueNumber (backwards compatibility)", () => {
+        it("should validate serialized data without project-level fields", () => {
             const data: SerializedData = createDefaultSerializedData();
-            assert.strictEqual(data.codeQualityIssueNumber, undefined);
+            assert.strictEqual((data as unknown as { codeQualityIssueNumber?: number }).codeQualityIssueNumber, undefined);
             assert.strictEqual(validateSerializedData(data), true);
         });
 
-        it("should preserve codeQualityIssueNumber through JSON round-trip", () => {
+        it("should preserve schemaVersion through JSON round-trip", () => {
             const data: SerializedData = {
                 ...createDefaultSerializedData(),
-                codeQualityIssueNumber: 123,
             };
             const json = JSON.stringify(data);
             const parsed = JSON.parse(json) as SerializedData;
-            assert.strictEqual(parsed.codeQualityIssueNumber, 123);
+            assert.strictEqual(parsed.schemaVersion, AUDIT_STATE_SCHEMA_VERSION);
         });
 
-        it("should have undefined codeQualityIssueNumber when not in JSON", () => {
+        it("should require schemaVersion", () => {
             const json = JSON.stringify({
-                clientRemote: "",
-                gitRemote: "",
-                gitSha: "",
                 treeEntries: [],
                 auditedFiles: [],
                 partiallyAuditedFiles: [],
                 resolvedEntries: [],
             });
             const parsed = JSON.parse(json) as SerializedData;
-            assert.strictEqual(parsed.codeQualityIssueNumber, undefined);
+            assert.strictEqual(validateSerializedData(parsed), false);
         });
     });
 });

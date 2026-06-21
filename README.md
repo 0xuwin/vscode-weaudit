@@ -145,7 +145,7 @@ You can view findings in a list, or grouped by filename by clicking on the `View
 
 ### Multiple Users
 
-You can share the weAudit file with you co-auditors to share findings. This file is located in the `.vscode` folder in your workspace named `$USERNAME.weaudit`.
+You can share the weAudit file with your co-auditors to share findings. This JSON file is located in the `.vscode` folder in your workspace named `$USERNAME.weaudit`. It stores user-level audit state such as findings, notes, locations, resolved findings, audited files, partially audited ranges, and finding detail fields.
 
 In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries.
 There are color settings for other user's findings and notes, and for your own findings and notes.

@@ -25,7 +25,6 @@ import {
     isOldEntry,
     Repository,
     createDefaultEntryDetails,
-    createDefaultSerializedData,
     createLocationEntry,
     isPathOrganizerEntry,
     FindingDifficulty,
@@ -34,7 +33,7 @@ import {
     isEnumValue,
     EntryType,
     RemoteAndPermalink,
-    validateSerializedData,
+    AUDIT_STATE_SCHEMA_VERSION,
     createPathOrganizer,
     getEntryIndexFromArray,
     treeViewModeLabel,
@@ -49,13 +48,14 @@ import {
     RootPathAndLabel,
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
+import { readAuditState, writeAuditState } from "./auditState/storage";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
 
 /**
  * Class representing a WeAudit workspace root. Each root maintains its own set of
- * configuration files (configs) with clientRemote, gitRemote, gitSha, treeEntries, auditedFiles,
+ * configuration files (configs) with treeEntries, auditedFiles,
  * and resolvedEntries. Additionally, it maintains a markedFilesDayLog.
  */
 class WARoot {
@@ -268,25 +268,7 @@ class WARoot {
             fs.mkdirSync(vscodeFolder);
         }
 
-        const filename = path.join(vscodeFolder, this.username + SERIALIZED_FILE_EXTENSION);
-        let newData;
-        if (!fs.existsSync(filename)) {
-            const dataToSerialize = createDefaultSerializedData();
-            dataToSerialize.clientRemote = this.clientRemote;
-            newData = JSON.stringify(dataToSerialize, null, 2);
-
-            // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
-            this.configs.push(configEntry);
-            this.currentlySelectedConfigs.push(configEntry);
-        } else {
-            const data = fs.readFileSync(filename).toString();
-            const parsedEntries = JSON.parse(data) as SerializedData;
-            parsedEntries.clientRemote = this.clientRemote;
-            newData = JSON.stringify(parsedEntries, null, 2);
-        }
-        fs.writeFileSync(filename, newData, { flag: "w+" });
+        void this.updateSavedData(this.username);
     }
 
     /**
@@ -306,25 +288,7 @@ class WARoot {
             fs.mkdirSync(vscodeFolder);
         }
 
-        const filename = path.join(vscodeFolder, this.username + SERIALIZED_FILE_EXTENSION);
-        let newData;
-        if (!fs.existsSync(filename)) {
-            const dataToSerialize = createDefaultSerializedData();
-            dataToSerialize.gitRemote = this.gitRemote;
-            newData = JSON.stringify(dataToSerialize, null, 2);
-
-            // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
-            this.configs.push(configEntry);
-            this.currentlySelectedConfigs.push(configEntry);
-        } else {
-            const data = fs.readFileSync(filename).toString();
-            const parsedEntries = JSON.parse(data) as SerializedData;
-            parsedEntries.gitRemote = this.gitRemote;
-            newData = JSON.stringify(parsedEntries, null, 2);
-        }
-        fs.writeFileSync(filename, newData, { flag: "w+" });
+        void this.updateSavedData(this.username);
     }
 
     /**
@@ -344,25 +308,7 @@ class WARoot {
             fs.mkdirSync(vscodeFolder);
         }
 
-        const filename = path.join(vscodeFolder, this.username + SERIALIZED_FILE_EXTENSION);
-        let newData;
-        if (!fs.existsSync(filename)) {
-            const dataToSerialize = createDefaultSerializedData();
-            dataToSerialize.gitSha = this.gitSha;
-            newData = JSON.stringify(dataToSerialize, null, 2);
-
-            // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
-            this.configs.push(configEntry);
-            this.currentlySelectedConfigs.push(configEntry);
-        } else {
-            const data = fs.readFileSync(filename).toString();
-            const parsedEntries = JSON.parse(data) as SerializedData;
-            parsedEntries.gitSha = this.gitSha;
-            newData = JSON.stringify(parsedEntries, null, 2);
-        }
-        fs.writeFileSync(filename, newData, { flag: "w+" });
+        void this.updateSavedData(this.username);
     }
 
     /**
@@ -869,10 +815,8 @@ class WARoot {
         if (!fs.existsSync(config.path)) {
             return;
         }
-        const data = fs.readFileSync(config.path).toString();
-        const parsedEntries = JSON.parse(data) as SerializedData;
-
-        if (!validateSerializedData(parsedEntries)) {
+        const parsedEntries = readAuditState(config.path);
+        if (parsedEntries === undefined) {
             vscode.window.showErrorMessage(`weAudit: Error loading serialized data for ${config.username}. Filepath: ${config.path}`);
             return;
         }
@@ -882,22 +826,6 @@ class WARoot {
                 `weAudit: Error loading data for ${config.username}. Filepath: ${config.path} is not in the expected workspace root.`,
             );
             return;
-        }
-
-        // load client remote if it exists and if the file is the current user's file
-        if (config.username === this.username) {
-            if (parsedEntries.clientRemote !== undefined) {
-                this.clientRemote = parsedEntries.clientRemote;
-            }
-            if (parsedEntries.gitRemote !== undefined) {
-                this.gitRemote = parsedEntries.gitRemote;
-            }
-            if (parsedEntries.gitSha !== undefined) {
-                this.gitSha = parsedEntries.gitSha;
-            }
-            if (parsedEntries.codeQualityIssueNumber !== undefined) {
-                this.codeQualityIssueNumber = parsedEntries.codeQualityIssueNumber;
-            }
         }
 
         for (const entry of parsedEntries.treeEntries) {
@@ -1004,9 +932,6 @@ class WARoot {
         }
 
         if (
-            !!this.clientRemote ||
-            !!this.gitRemote ||
-            !!this.gitSha ||
             reducedEntries.length !== 0 ||
             filteredAuditedFiles.length !== 0 ||
             filteredPartiallyAuditedEntries.length !== 0 ||
@@ -1032,21 +957,14 @@ class WARoot {
         // this means we are deleting the last element
         if (toCreateData || existsFile) {
             // save findings to file
-            const serializedObj: Record<string, unknown> = {
-                clientRemote: this.clientRemote,
-                gitRemote: this.gitRemote,
-                gitSha: this.gitSha,
+            const serializedObj: SerializedData = {
+                schemaVersion: AUDIT_STATE_SCHEMA_VERSION,
                 treeEntries: reducedEntries,
                 auditedFiles: filteredAuditedFiles,
                 partiallyAuditedFiles: filteredPartiallyAuditedEntries,
                 resolvedEntries: reducedResolvedEntries,
             };
-            if (this.codeQualityIssueNumber !== undefined) {
-                serializedObj.codeQualityIssueNumber = this.codeQualityIssueNumber;
-            }
-            const data = JSON.stringify(serializedObj, null, 2);
-
-            fs.writeFileSync(fileName, data, { flag: "w+" });
+            writeAuditState(fileName, serializedObj);
         }
     }
 
@@ -2302,6 +2220,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 break;
             case "label": {
                 entry.label = value;
+                entry.details.title = value;
                 this.refreshTree();
                 this.refreshAndDecorateEntry(entry);
                 treeView.reveal(entry);
@@ -2536,6 +2455,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
         entry.label = label;
+        entry.details.title = label;
         treeView.reveal(entry);
         this.refreshTree();
         this.decorate();
@@ -2843,11 +2763,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             auditPermalinks.push(auditRemoteAndPermalink.permalink);
 
             // Include location section if there's a label or description
-            if (location.label !== "" || location.description !== "") {
+            const locationDescription = location.description ?? "";
+            if (location.label !== "" || locationDescription !== "") {
                 locationDescriptions += `\n\n---\n`;
                 locationDescriptions += `#### Location ${i + 1} ${location.label ?? ""}\n`;
-                if (location.description !== "") {
-                    locationDescriptions += `${location.description}\n\n`;
+                if (locationDescription !== "") {
+                    locationDescriptions += `${locationDescription}\n\n`;
                 }
                 locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
             }
@@ -2870,15 +2791,21 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const target = Array.from(locationSet).join(", ");
         const permalinks = auditPermalinks.join("\n");
         const clientPermalinkString = clientPermalinks.join("\n");
+        const severity = String(entry.details.severity ?? "");
+        const difficulty = String(entry.details.difficulty ?? "");
+        const findingType = String(entry.details.type ?? "");
+        const description = String(entry.details.description ?? "");
+        const exploit = String(entry.details.exploit ?? "");
+        const recommendation = String(entry.details.recommendation ?? "");
 
         let issueBodyText = `### Title\n${entry.label}\n\n`;
-        issueBodyText += `### Severity\n${entry.details.severity}\n\n`;
-        issueBodyText += `### Difficulty\n${entry.details.difficulty}\n\n`;
-        issueBodyText += `### Type\n${entry.details.type}\n\n`;
+        issueBodyText += `### Severity\n${severity}\n\n`;
+        issueBodyText += `### Difficulty\n${difficulty}\n\n`;
+        issueBodyText += `### Type\n${findingType}\n\n`;
         issueBodyText += `### Target\n${target}\n\n`;
-        issueBodyText += `## Description\n${entry.details.description}${locationDescriptions}\n\n`;
-        issueBodyText += `## Exploit Scenario\n${entry.details.exploit}\n\n`;
-        issueBodyText += `## Recommendations\n${entry.details.recommendation}\n\n\n`;
+        issueBodyText += `## Description\n${description}${locationDescriptions}\n\n`;
+        issueBodyText += `## Exploit Scenario\n${exploit}\n\n`;
+        issueBodyText += `## Recommendations\n${recommendation}\n\n\n`;
 
         issueBodyText += `Permalink:\n${permalinks}\n\n`;
         // TODO: this breaks the finding writer
@@ -2918,11 +2845,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             clientPermalinks.push(clientPermalink);
             auditPermalinks.push(auditRemoteAndPermalink.permalink);
 
-            if (location.label !== "" || location.description !== "") {
+            const locationDescription = location.description ?? "";
+            if (location.label !== "" || locationDescription !== "") {
                 locationDescriptions += `\n\n---\n`;
                 locationDescriptions += `#### Location ${i + 1} ${location.label ?? ""}\n`;
-                if (location.description !== "") {
-                    locationDescriptions += `${location.description}\n\n`;
+                if (locationDescription !== "") {
+                    locationDescriptions += `${locationDescription}\n\n`;
                 }
                 locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
             }
@@ -2932,7 +2860,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const clientPermalinkString = clientPermalinks.join("\n");
 
         let bodyText = `### Title\n${entry.label}\n\n`;
-        bodyText += `## Description\n${entry.details.description}${locationDescriptions}\n\n`;
+        bodyText += `## Description\n${entry.details.description ?? ""}${locationDescriptions}\n\n`;
         bodyText += `Permalink:\n${permalinks}\n\n`;
         if (clientPermalinkString !== "" && atLeastOneUniqueClientRemote) {
             bodyText += `Client PermaLink:\n${clientPermalinkString}\n`;
@@ -3364,7 +3292,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 entryType: entryType,
                 author: this.username,
                 locations: locations,
-                details: createDefaultEntryDetails(),
+                details: { ...createDefaultEntryDetails(), title },
             };
             this.treeEntries.push(entry);
             void this.updateSavedData(this.username);
@@ -3380,7 +3308,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entryType: locationEntry.parentEntry.entryType,
             author: this.username,
             locations: [locationEntry.location],
-            details: createDefaultEntryDetails(),
+            details: {
+                ...createDefaultEntryDetails(),
+                title: locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label,
+            },
         };
         this.treeEntries.push(entry);
         void this.updateSavedData(this.username);
@@ -3598,12 +3529,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        // For backwards compatibility, we need to add the rootpath to the locations here
+        // rootPath is runtime-only and is derived from the .weaudit file's workspace root.
         const rootPath = wsRoot.rootPath;
         const fullParsedEntries = {
-            clientRemote: parsedEntries.clientRemote,
-            gitRemote: parsedEntries.gitRemote,
-            gitSha: parsedEntries.gitSha,
+            schemaVersion: parsedEntries.schemaVersion,
             treeEntries: parsedEntries.treeEntries.map(
                 (entry) =>
                     ({
@@ -3625,7 +3554,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     }) as FullEntry,
             ),
             auditedFiles: parsedEntries.auditedFiles,
-            // older versions do not have partiallyAuditedFiles
             partiallyAuditedFiles: parsedEntries.partiallyAuditedFiles,
             resolvedEntries: parsedEntries.resolvedEntries.map(
                 (entry) =>
@@ -4520,7 +4448,9 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                 // - join the details to the new one
                 // - discard the details but drag
                 // - discard the drag and drop action
-                if (entry.details.description !== "" || entry.details.exploit !== "") {
+                const entryDescription = String(entry.details.description ?? "");
+                const entryExploit = String(entry.details.exploit ?? "");
+                if (entryDescription !== "" || entryExploit !== "") {
                     const choice = await vscode.window
                         .showWarningMessage(
                             "The item being dragged contains detailed information. Do you want to...",
@@ -4538,17 +4468,20 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                     }
 
                     switch (choice) {
-                        case "Join details":
-                            if (target.details.description !== "") {
-                                target.details.description += "\n";
+                        case "Join details": {
+                            const targetDescription = String(target.details.description ?? "");
+                            const targetExploit = String(target.details.exploit ?? "");
+                            if (targetDescription !== "") {
+                                target.details.description = `${targetDescription}\n`;
                             }
-                            target.details.description += entry.details.description;
+                            target.details.description = `${String(target.details.description ?? "")}${entryDescription}`;
 
-                            if (target.details.exploit !== "") {
-                                target.details.exploit += "\n";
+                            if (targetExploit !== "") {
+                                target.details.exploit = `${targetExploit}\n`;
                             }
-                            target.details.exploit += entry.details.exploit;
+                            target.details.exploit = `${String(target.details.exploit ?? "")}${entryExploit}`;
                             break;
+                        }
 
                         case "Discard old details":
                             break;

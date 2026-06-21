@@ -6,6 +6,7 @@ import {
     FindingSeverity,
     FindingType,
     SerializedData,
+    AUDIT_STATE_SCHEMA_VERSION,
     createDefaultSerializedData,
     validateSerializedData,
 } from "../../src/types";
@@ -19,6 +20,7 @@ function createValidEntry() {
         entryType: EntryType.Finding,
         author: "testuser",
         details: {
+            title: "Test Finding",
             severity: FindingSeverity.Medium,
             difficulty: FindingDifficulty.Low,
             type: FindingType.DataValidation,
@@ -43,9 +45,7 @@ function createValidEntry() {
  */
 function createValidSerializedData(): SerializedData {
     return {
-        clientRemote: "https://github.com/client/repo",
-        gitRemote: "https://github.com/auditor/repo",
-        gitSha: "abc123",
+        schemaVersion: AUDIT_STATE_SCHEMA_VERSION,
         treeEntries: [createValidEntry()],
         auditedFiles: [{ path: "src/reviewed.ts", author: "testuser" }],
         partiallyAuditedFiles: [{ path: "src/partial.ts", author: "testuser", startLine: 0, endLine: 50 }],
@@ -65,24 +65,23 @@ describe("validateSerializedData", () => {
             expect(validateSerializedData(data)).to.equal(true);
         });
 
-        it("accepts legacy data without partiallyAuditedFiles field", () => {
+        it("accepts data without partiallyAuditedFiles field", () => {
             const data: any = {
-                clientRemote: "",
-                gitRemote: "",
-                gitSha: "",
+                schemaVersion: AUDIT_STATE_SCHEMA_VERSION,
                 treeEntries: [],
                 auditedFiles: [],
                 resolvedEntries: [],
-                // Note: partiallyAuditedFiles is intentionally omitted
             };
             expect(validateSerializedData(data)).to.equal(true);
         });
 
-        it("accepts payload with empty string remotes", () => {
+        it("accepts flattened custom detail fields", () => {
             const data = createDefaultSerializedData();
-            data.clientRemote = "";
-            data.gitRemote = "";
-            data.gitSha = "";
+            const entry = createValidEntry();
+            entry.details.findingType = "Issue";
+            entry.details.id = 1;
+            entry.details.confirmed = true;
+            data.treeEntries = [entry];
             expect(validateSerializedData(data)).to.equal(true);
         });
 
@@ -118,9 +117,7 @@ describe("validateSerializedData", () => {
     describe("missing top-level arrays", () => {
         it("rejects missing treeEntries", () => {
             const data: any = {
-                clientRemote: "",
-                gitRemote: "",
-                gitSha: "",
+                schemaVersion: AUDIT_STATE_SCHEMA_VERSION,
                 treeEntries: undefined,
                 auditedFiles: [],
                 resolvedEntries: [],
@@ -130,9 +127,7 @@ describe("validateSerializedData", () => {
 
         it("rejects missing auditedFiles", () => {
             const data: any = {
-                clientRemote: "",
-                gitRemote: "",
-                gitSha: "",
+                schemaVersion: AUDIT_STATE_SCHEMA_VERSION,
                 treeEntries: [],
                 auditedFiles: undefined,
                 resolvedEntries: [],
@@ -142,9 +137,7 @@ describe("validateSerializedData", () => {
 
         it("rejects missing resolvedEntries", () => {
             const data: any = {
-                clientRemote: "",
-                gitRemote: "",
-                gitSha: "",
+                schemaVersion: AUDIT_STATE_SCHEMA_VERSION,
                 treeEntries: [],
                 auditedFiles: [],
                 resolvedEntries: undefined,
@@ -370,75 +363,24 @@ describe("validateSerializedData", () => {
         });
     });
 
-    describe("invalid entryDetails fields", () => {
-        it("rejects entryDetails missing severity", () => {
+    describe("entryDetails fields", () => {
+        it("accepts entryDetails missing optional legacy fields", () => {
             const data = createDefaultSerializedData();
             const entry: any = createValidEntry();
             delete entry.details.severity;
-            data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
-        });
-
-        it("rejects entryDetails with undefined severity", () => {
-            const data = createDefaultSerializedData();
-            const entry: any = createValidEntry();
-            entry.details.severity = undefined;
-            data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
-        });
-
-        it("rejects entryDetails missing difficulty", () => {
-            const data = createDefaultSerializedData();
-            const entry: any = createValidEntry();
             delete entry.details.difficulty;
-            data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
-        });
-
-        it("rejects entryDetails with undefined difficulty", () => {
-            const data = createDefaultSerializedData();
-            const entry: any = createValidEntry();
-            entry.details.difficulty = undefined;
-            data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
-        });
-
-        it("rejects entryDetails missing type", () => {
-            const data = createDefaultSerializedData();
-            const entry: any = createValidEntry();
             delete entry.details.type;
-            data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
-        });
-
-        it("rejects entryDetails with undefined type", () => {
-            const data = createDefaultSerializedData();
-            const entry: any = createValidEntry();
-            entry.details.type = undefined;
-            data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
-        });
-
-        it("rejects entryDetails missing description", () => {
-            const data = createDefaultSerializedData();
-            const entry: any = createValidEntry();
             delete entry.details.description;
-            data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
-        });
-
-        it("rejects entryDetails missing exploit", () => {
-            const data = createDefaultSerializedData();
-            const entry: any = createValidEntry();
             delete entry.details.exploit;
+            delete entry.details.recommendation;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            expect(validateSerializedData(data)).to.equal(true);
         });
 
-        it("rejects entryDetails missing recommendation", () => {
+        it("rejects entryDetails that are not objects", () => {
             const data = createDefaultSerializedData();
             const entry: any = createValidEntry();
-            delete entry.details.recommendation;
+            entry.details = [];
             data.treeEntries = [entry];
             expect(validateSerializedData(data)).to.equal(false);
         });
@@ -471,7 +413,7 @@ describe("validateSerializedData", () => {
             expect(validateSerializedData(data)).to.equal(true);
         });
 
-        it("accepts data with codeQualityIssueNumber field", () => {
+        it("accepts extra non-schema top-level fields", () => {
             const data: any = {
                 ...createValidSerializedData(),
                 codeQualityIssueNumber: 42,
@@ -479,9 +421,9 @@ describe("validateSerializedData", () => {
             expect(validateSerializedData(data)).to.equal(true);
         });
 
-        it("accepts data without codeQualityIssueNumber (backwards compatibility)", () => {
+        it("does not include codeQualityIssueNumber in new serialized data", () => {
             const data = createValidSerializedData();
-            expect(data.codeQualityIssueNumber).to.be.undefined;
+            expect((data as any).codeQualityIssueNumber).to.be.undefined;
             expect(validateSerializedData(data)).to.equal(true);
         });
 

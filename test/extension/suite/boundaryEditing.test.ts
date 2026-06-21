@@ -32,16 +32,14 @@ function writeWeauditWithFinding(workspaceFolder: vscode.WorkspaceFolder, startL
     const filePath = getWeauditFilePath(workspaceFolder);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const payload = {
-        clientRemote: "",
-        gitRemote: "",
-        gitSha: "",
+        schemaVersion: 1,
         treeEntries: [
             {
                 label: "Test Finding",
                 entryType: 0,
                 author: vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username,
                 locations: [{ path: "src/sample.ts", startLine, endLine, label: "", description: "" }],
-                details: { severity: "", difficulty: "", type: "", description: "", exploit: "", recommendation: "" },
+                details: { title: "Test Finding", severity: "", difficulty: "", type: "", description: "", exploit: "", recommendation: "" },
             },
         ],
         auditedFiles: [],
