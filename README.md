@@ -42,6 +42,8 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
 -   [**Export Findings**](#export-findings) - Export findings to a markdown file.
 -   [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
+-   [**Project Config**](#project-config) - Configure repositories, versions, and project metadata in `.vscode/info.json`.
+-   [**Finding Schema**](#finding-schema) - Customize finding detail fields, severity options, and tree labels.
 -   [**Settings**](#settings) - Customize colors and general preferences.
 
 ---
@@ -95,7 +97,7 @@ You can fill detailed information about a finding by clicking on it in the _List
 
 ### Copy as Markdown
 
-You can copy a finding's detailed information as Markdown by clicking the `Copy as Markdown` button in the _List of Findings_ panel or the same button in the _Finding Details_ view. The copied Markdown includes the finding details and configured permalinks.
+You can copy a finding's detailed information as Markdown by clicking the `Copy as Markdown` button in the _List of Findings_ panel or the same button in the _Finding Details_ view. The copied Markdown includes the finding detail fields (rendered from the configured schema) followed by code references with file paths, line ranges, and code snippets.
 
 ![Copy as Markdown](media/readme/gifs/create_gh_issue.gif)
 
@@ -119,7 +121,7 @@ You can resolve a finding by clicking on the corresponding `Resolve` button in t
 
 ### Copy Permalinks
 
-Copy the configured source permalink by clicking on the corresponding `Copy Audit Permalink` button in the _List of Findings_ panel.
+Copy a source permalink by clicking on the corresponding `Copy Audit Permalink` button in the _List of Findings_ panel. Permalinks are resolved from `.vscode/info.json` — the matching repository's remote and version commit are used to generate the URL.
 
 ![Copy Audit Permalink](media/readme/copy_permalink.png)
 
@@ -196,6 +198,7 @@ You can drag and drop findings and locations in the _List of Findings_ panel to:
 -   `weAudit.general.treeViewMode`: The List of Findings display mode ("list" or "byFile")
 -   `weAudit.general.username`: Username to use as finding's author (defaults to system username if empty)
 -   `weAudit.general.permalinkSeparator`: Separator to use in permalinks (\\n is interpreted as newline)
+-   `weAudit.general.sortEntriesAlphabetically`: Sort findings and notes alphabetically by name in the tree view
 
 #### Finding Schema settings
 
@@ -214,11 +217,11 @@ Each background color is customizable via the VSCode settings page. Write as #RG
 
 You can configure the keybindings to any of the extension's commands in the VSCode settings. The default shortcuts are:
 
--   `weAudit.addFinding`: Add Selected Code To Findings: `cmd + 3`
--   `weAudit.addNote`: Add Selected Code To Notes: `cmd + 4`
--   `weAudit.deleteLocationUnderCursor`: Delete Finding Under Cursor: `cmd + 5`
--   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
--   `weAudit.addPartiallyAudited`: Mark Region As Reviewed: `cmd + shift + 7`
+-   `weAudit.addFinding`: New Finding from Selection: `cmd + 3`
+-   `weAudit.addNote`: New Note from Selection: `cmd + 4`
+-   `weAudit.addRegionToAnEntry`: Add Region to a Finding: `cmd + 5`
+-   `weAudit.deleteLocationUnderCursor`: Delete Location Under Cursor: `cmd + 6`
+-   `weAudit.addPartiallyAudited`: Mark Region as Reviewed: `cmd + 7`
 -   `weAudit.navigateToNextPartiallyAuditedRegion`: Navigate to Next Partially Audited Region: `cmd + 0`
 -   `weAudit.boundaryExpandUp`: Expand Finding Up: `cmd + shift + numpad7`
 -   `weAudit.boundaryMoveUp`: Move Finding Up: `cmd + shift + numpad8`
@@ -231,7 +234,7 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 
 ## WeAudit Concepts
 
--   **Findings and Notes**: A region of code that is of interest. Findings can be marked as "Resolved" or "Restored". There is no actual difference between findings and notes, except that they can be assigned different colors and that findings are displayed before notes in the _List of Findings_ panel.
+-   **Findings and Notes**: A region of code that is of interest. Findings can be marked as "Resolved" or "Restored". There is no actual difference between findings and notes, except that they can be assigned different colors. By default, findings are displayed before notes in the _List of Findings_ panel.
 -   **Audited Files**: A file that has been reviewed. This is a binary state, either a file is audited or it is not.
 -   **Project Repositories**: Repositories are declared in `.vscode/info.json`, including their workspace-relative roots, remotes, and named versions/commits. weAudit uses this project config to resolve source permalinks and reporting metadata.
 
