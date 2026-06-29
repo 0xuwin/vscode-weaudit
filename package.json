@@ -546,6 +546,22 @@
                         "default": false,
                         "description": "Sort findings and notes alphabetically by name in the tree view."
                     },
+                    "weAudit.findingSchema.severityOptions": {
+                        "type": "array",
+                        "description": "Options shown in the fixed Severity dropdown.",
+                        "default": [
+                            "",
+                            "Code Quality",
+                            "Informational",
+                            "Undetermined",
+                            "Low",
+                            "Medium",
+                            "High"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "weAudit.findingSchema.fields": {
                         "type": "array",
                         "description": "Additional finding detail fields rendered after title, severity, and description.",

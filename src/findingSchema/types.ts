@@ -1,6 +1,7 @@
 import { DetailValue } from "../types";
 
 export const FINDING_SCHEMA_FIELDS_SETTING = "findingSchema.fields";
+export const FINDING_SCHEMA_SEVERITY_OPTIONS_SETTING = "findingSchema.severityOptions";
 
 /** Supported field control types for finding details. */
 export type FindingSchemaFieldType = "text" | "textarea" | "select" | "checkbox" | "number";

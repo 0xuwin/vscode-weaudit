@@ -1,23 +1,28 @@
 import { FindingDifficulty, FindingSeverity, FindingType } from "../types";
 import { FindingSchemaField } from "./types";
 
+/** Default severity options for the fixed Severity field. */
+export function createDefaultSeverityOptions(): string[] {
+    return [
+        "",
+        FindingSeverity.CodeQuality,
+        FindingSeverity.Informational,
+        FindingSeverity.Undetermined,
+        FindingSeverity.Low,
+        FindingSeverity.Medium,
+        FindingSeverity.High,
+    ];
+}
+
 /** Default fixed fields shown for every finding. */
-export function createFixedFindingSchemaFields(): FindingSchemaField[] {
+export function createFixedFindingSchemaFields(severityOptions: string[] = createDefaultSeverityOptions()): FindingSchemaField[] {
     return [
         { key: "title", label: "Title", type: "text", required: true },
         {
             key: "severity",
             label: "Severity",
             type: "select",
-            options: [
-                "",
-                FindingSeverity.CodeQuality,
-                FindingSeverity.Informational,
-                FindingSeverity.Undetermined,
-                FindingSeverity.Low,
-                FindingSeverity.Medium,
-                FindingSeverity.High,
-            ],
+            options: severityOptions,
         },
         { key: "description", label: "Description", type: "textarea", placeholder: "The finding details", rows: 5 },
     ];

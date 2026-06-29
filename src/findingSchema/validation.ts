@@ -47,6 +47,22 @@ export function validateFindingSchemaFields(fields: unknown): FindingSchemaValid
 }
 
 /**
+ * Validates fixed Severity field options loaded from settings.
+ */
+export function validateSeverityOptions(options: unknown): FindingSchemaValidationResult {
+    if (!Array.isArray(options)) {
+        return { errors: ["findingSchema.severityOptions must be an array."] };
+    }
+    if (options.length === 0) {
+        return { errors: ["findingSchema.severityOptions must contain at least one option."] };
+    }
+    if (options.some((option) => typeof option !== "string")) {
+        return { errors: ["findingSchema.severityOptions must contain only strings."] };
+    }
+    return { errors: [] };
+}
+
+/**
  * Validates conditional visibility rules for a schema field.
  */
 function validateVisibleWhen(field: FindingSchemaField, path: string, errors: string[]): void {
