@@ -2,7 +2,7 @@ import * as assert from "node:assert";
 
 import { normalizeGitRemote } from "../../src/projectConfig/gitRemote";
 
-describe("Git Config Parsing Logic", () => {
+describe("Git Remote Parsing Logic", () => {
     const remoteUrlPattern = /url = (.*)/g;
 
     describe("remote URL extraction", () => {

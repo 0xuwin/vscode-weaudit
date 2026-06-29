@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { SERIALIZED_FILE_EXTENSION } from "./codeMarker";
+import { SERIALIZED_FILE_EXTENSION } from "./workspace/workspaceRoot";
 import {
     ConfigurationEntry,
     WorkspaceRootEntry,

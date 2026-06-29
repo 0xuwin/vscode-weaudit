@@ -541,7 +541,7 @@ export function isEntry(treeEntry: TreeEntry): treeEntry is FullEntry {
 }
 
 /**
- * Type predicate for backwards compatibility purposes
+ * Type predicate for entries without rootPath (external/SARIF imports).
  */
 export function isOldEntry(entry: Entry | FullEntry | FullLocationEntry): entry is Entry {
     return (entry as FullEntry).locations[0]?.rootPath === undefined && (entry as FullLocationEntry).location?.rootPath === undefined;

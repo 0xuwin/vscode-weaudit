@@ -3,7 +3,7 @@ import * as assert from "node:assert";
 import { generateSourcePermalink } from "../../src/permalinks/permalink";
 
 /**
- * Tests for permalink generation logic used in codeMarker.ts:2595-2603
+ * Tests for permalink generation logic in src/permalinks/permalink.ts.
  *
  * The actual getRemoteAndPermalink method is tightly coupled to VS Code API.
  * These tests verify the URL building logic and edge cases.
@@ -11,7 +11,7 @@ import { generateSourcePermalink } from "../../src/permalinks/permalink";
 describe("Permalink Generation Logic", () => {
     /**
      * Generates a permalink based on the remote URL, SHA, and location.
-     * This mirrors the logic in codeMarker.ts:2595-2603
+     * Mirrors the logic in src/permalinks/permalink.ts.
      */
     const generatePermalink = generateSourcePermalink;
 
@@ -20,8 +20,8 @@ describe("Permalink Generation Logic", () => {
         const sha = "abc123def456";
 
         it("should generate correct blob-style permalink", () => {
-            const permalink = generatePermalink(gitRemote, sha, "src/codeMarker.ts", 10, 20);
-            assert.strictEqual(permalink, "https://example.com/trailofbits/vscode-weaudit/blob/abc123def456/src/codeMarker.ts#L11-L21");
+            const permalink = generatePermalink(gitRemote, sha, "src/extension.ts", 10, 20);
+            assert.strictEqual(permalink, "https://example.com/trailofbits/vscode-weaudit/blob/abc123def456/src/extension.ts#L11-L21");
         });
 
         it("should convert 0-indexed lines to 1-indexed", () => {

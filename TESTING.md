@@ -241,7 +241,7 @@ Native dialogs (file open, context menus, title bar menus) are **not automatable
 |------|------|-------------|
 | `validateSerializedData` accepts valid payload | + | Full payload with all fields |
 | `validateSerializedData` accepts minimal payload | + | Empty arrays, empty strings |
-| `validateSerializedData` accepts legacy data without `partiallyAuditedFiles` | + | Backwards compatibility |
+| `validateSerializedData` accepts data without `partiallyAuditedFiles` | + | Optional field omitted |
 | `validateSerializedData` rejects missing `treeEntries` | - | `undefined` or missing key |
 | `validateSerializedData` rejects missing `auditedFiles` | - | `undefined` or missing key |
 | `validateSerializedData` rejects missing `resolvedEntries` | - | `undefined` or missing key |
