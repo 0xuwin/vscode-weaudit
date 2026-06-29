@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { userInfo } from "os";
+import { spawnSync } from "child_process";
 
 import {
     AuditedFile,
@@ -455,6 +456,7 @@ export class WARoot {
         const editor = vscode.window.activeTextEditor!;
         const uri = editor.document.uri;
         const relativePath = path.relative(this.rootPath, uri.fsPath);
+        const commit = this.getCurrentGitCommit();
 
         return editor.selections.map((selection) => {
             const startLine = selection.start.line;
@@ -479,8 +481,20 @@ export class WARoot {
             }
 
             // TODO: error if not in this workspace root?
-            return { path: relativePath, startLine, endLine, label: "", codeSnippet: codeSnippet.join("\n"), rootPath: this.rootPath };
+            return { path: relativePath, startLine, endLine, label: "", codeSnippet: codeSnippet.join("\n"), rootPath: this.rootPath, commit };
         });
+    }
+
+    /**
+     * Returns the current git commit hash for this workspace root, or undefined if not a git repo.
+     */
+    private getCurrentGitCommit(): string | undefined {
+        const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: this.rootPath, encoding: "utf8" });
+        if (result.status !== 0) {
+            return;
+        }
+        const commit = result.stdout.trim();
+        return commit === "" ? undefined : commit;
     }
 
     /**
@@ -608,6 +622,7 @@ export class WARoot {
                                 endLine: location.endLine,
                                 label: location.label,
                                 codeSnippet: location.codeSnippet,
+                                commit: location.commit,
                             }) as Location,
                     ),
                 }) as Entry,
@@ -627,6 +642,7 @@ export class WARoot {
                                 endLine: location.endLine,
                                 label: location.label,
                                 codeSnippet: location.codeSnippet,
+                                commit: location.commit,
                             }) as Location,
                     ),
                 }) as Entry,
