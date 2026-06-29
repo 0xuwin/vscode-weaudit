@@ -207,18 +207,14 @@ export interface EntryDetails {
 }
 
 /**
- * Creates a default entry details object.
+ * Creates a default entry details object with only fixed fields.
+ * Dynamic fields are populated by the finding schema when rendering.
  * @returns the default entry details object
  */
 export function createDefaultEntryDetails(): EntryDetails {
     return {
         title: "",
-        severity: FindingSeverity.Undefined,
         description: "",
-        difficulty: FindingDifficulty.Undefined,
-        type: FindingType.Undefined,
-        exploit: "",
-        recommendation: "Short term, \nLong term, \n",
     };
 }
 

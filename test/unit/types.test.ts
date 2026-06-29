@@ -46,16 +46,16 @@ describe("types.ts", () => {
     });
 
     describe("createDefaultEntryDetails", () => {
-        it("should create default entry details with undefined enums and empty strings", () => {
+        it("should create default entry details with only title and description", () => {
             const details = createDefaultEntryDetails();
 
             assert.strictEqual(details.title, "");
-            assert.strictEqual(details.severity, FindingSeverity.Undefined);
-            assert.strictEqual(details.difficulty, FindingDifficulty.Undefined);
-            assert.strictEqual(details.type, FindingType.Undefined);
             assert.strictEqual(details.description, "");
-            assert.strictEqual(details.exploit, "");
-            assert.strictEqual(details.recommendation, "Short term, \nLong term, \n");
+            assert.strictEqual(details.severity, undefined);
+            assert.strictEqual(details.difficulty, undefined);
+            assert.strictEqual(details.type, undefined);
+            assert.strictEqual(details.exploit, undefined);
+            assert.strictEqual(details.recommendation, undefined);
         });
     });
 

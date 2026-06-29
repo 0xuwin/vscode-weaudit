@@ -41,6 +41,7 @@ import { resolveProjectRepository } from "./projectConfig/resolution";
 import { getProjectConfigPath, projectConfigExists, readProjectConfig } from "./projectConfig/storage";
 import { isValidProjectConfig, validateProjectConfig } from "./projectConfig/validation";
 import { loadFindingLabelTemplate, loadFindingSchema } from "./findingSchema/settings";
+import { createEntryDetailsFromSchema } from "./findingSchema/defaults";
 import { renderLabelTemplate } from "./findingSchema/labelTemplate";
 import { renderFindingMarkdown } from "./markdown/findingMarkdown";
 import { DragAndDropController } from "./tree/dragAndDropController";
@@ -1346,12 +1347,16 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 return;
             }
 
+            const details = entryType === EntryType.Finding
+                ? { ...createEntryDetailsFromSchema(loadFindingSchema()), title }
+                : { ...createDefaultEntryDetails(), title };
+
             const entry: FullEntry = {
                 label: title,
                 entryType: entryType,
                 author: this.username,
                 locations: locations,
-                details: { ...createDefaultEntryDetails(), title },
+                details,
             };
             this.applyFindingLabelTemplate(entry);
             this.treeEntries.push(entry);
@@ -1363,15 +1368,17 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     addNewEntryFromLocationEntry(locationEntry: FullLocationEntry): void {
+        const newLabel = locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label;
+        const details = locationEntry.parentEntry.entryType === EntryType.Finding
+            ? { ...createEntryDetailsFromSchema(loadFindingSchema()), title: newLabel }
+            : { ...createDefaultEntryDetails(), title: newLabel };
+
         const entry: FullEntry = {
-            label: locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label,
+            label: newLabel,
             entryType: locationEntry.parentEntry.entryType,
             author: this.username,
             locations: [locationEntry.location],
-            details: {
-                ...createDefaultEntryDetails(),
-                title: locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label,
-            },
+            details,
         };
         this.treeEntries.push(entry);
         void this.updateSavedData(this.username);
@@ -2429,7 +2436,7 @@ export class AuditMarker {
         }
 
         // Fills the Finding details webview with the currently selected entry details
-        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details);
+        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.entryType);
     }
 
     /**

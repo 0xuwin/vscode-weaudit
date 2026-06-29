@@ -261,16 +261,6 @@
                 "mac": "cmd+7"
             },
             {
-                "command": "weAudit.copySelectedCodePermalink",
-                "key": "ctrl+alt+8",
-                "mac": "cmd+8"
-            },
-            {
-                "command": "weAudit.copySelectedCodeClientPermalink",
-                "key": "ctrl+alt+9",
-                "mac": "cmd+9"
-            },
-            {
                 "command": "weAudit.navigateToNextPartiallyAuditedRegion",
                 "key": "ctrl+alt+0",
                 "mac": "cmd+0"
@@ -478,27 +468,27 @@
             "editor/context": [
                 {
                     "command": "weAudit.addFinding",
-                    "group": "1_modification@1"
+                    "group": "weAudit@1"
                 },
                 {
                     "command": "weAudit.addNote",
-                    "group": "1_modification@2"
+                    "group": "weAudit@2"
                 },
                 {
                     "command": "weAudit.addRegionToAnEntry",
-                    "group": "1_modification@3"
+                    "group": "weAudit@3"
                 },
                 {
                     "command": "weAudit.toggleAudited",
-                    "group": "1_modification@0"
+                    "group": "weAudit@4"
                 },
                 {
                     "command": "weAudit.copySelectedCodePermalink",
-                    "group": "9_cutcopypaste@0"
+                    "group": "weAudit@5"
                 },
                 {
                     "command": "weAudit.copySelectedCodeClientPermalink",
-                    "group": "9_cutcopypaste@0"
+                    "group": "weAudit@6"
                 }
             ]
         },
@@ -684,27 +674,27 @@
                 "properties": {
                     "weAudit.auditedColor": {
                         "type": "string",
-                        "default": "#00422355",
+                        "default": "#2d5a3a40",
                         "description": "Background color for files marked as reviewed (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
                     },
                     "weAudit.ownFindingColor": {
                         "type": "string",
-                        "default": "#ee335555",
+                        "default": "#8b3a3a40",
                         "description": "Background color for your own findings (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
                     },
                     "weAudit.otherFindingColor": {
                         "type": "string",
-                        "default": "#ee335555",
+                        "default": "#8b3a3a40",
                         "description": "Background color for other user's findings (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
                     },
                     "weAudit.ownNoteColor": {
                         "type": "string",
-                        "default": "#145ceb55",
+                        "default": "#3a5a8b40",
                         "description": "Background color for your own notes (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
                     },
                     "weAudit.otherNoteColor": {
                         "type": "string",
-                        "default": "#145ceb55",
+                        "default": "#3a5a8b40",
                         "description": "Background color for other user's notes (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
                     }
                 }

@@ -137,12 +137,24 @@ function createDropdown(field: FindingSchemaField): Dropdown {
     const element = document.createElement("vscode-dropdown") as Dropdown;
     element.id = field.key;
     element.setAttribute("position", "below");
+
+    const currentValue = currentDetails[field.key];
+    const hasValue = currentValue !== undefined && currentValue !== null && currentValue !== "";
+
+    // Add a placeholder option when no value is selected
+    if (!hasValue) {
+        const placeholder = document.createElement("vscode-option");
+        placeholder.textContent = field.placeholder ?? "...";
+        placeholder.setAttribute("value", "");
+        element.appendChild(placeholder);
+    }
+
     for (const option of field.options ?? []) {
         const optionElement = document.createElement("vscode-option");
         optionElement.textContent = option;
         element.appendChild(optionElement);
     }
-    element.value = stringifyDetailValue(currentDetails[field.key]);
+    element.value = hasValue ? stringifyDetailValue(currentValue) : "";
     element.addEventListener("change", (event) => {
         handlePersistentFieldChange(event);
         updateAllFieldVisibility();

@@ -2,10 +2,11 @@ import * as vscode from "vscode";
 import * as crypto from "crypto";
 
 import { getUri } from "../utilities/getUri";
-import { EntryDetails } from "../types";
+import { EntryDetails, EntryType } from "../types";
 import { WebviewMessage } from "../webview/webviewMessageTypes";
 import htmlBody from "./findingDetails.html";
 import { loadFindingSchema } from "../findingSchema/settings";
+import { createFixedFindingSchemaFields } from "../findingSchema/defaults";
 
 export function activateFindingDetailsWebview(context: vscode.ExtensionContext): void {
     const provider = new FindingDetailsProvider(context.extensionUri);
@@ -15,8 +16,8 @@ export function activateFindingDetailsWebview(context: vscode.ExtensionContext):
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails) => {
-            provider.setFindingDetails(entry);
+        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, entryType?: number) => {
+            provider.setFindingDetails(entry, entryType);
         }),
     );
 
@@ -59,12 +60,15 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
     /**
      * Set finding details in the webview
      */
-    public setFindingDetails(entry: EntryDetails): void {
+    public setFindingDetails(entry: EntryDetails, entryType?: number): void {
         if (this._view) {
+            const schema = entryType === EntryType.Note
+                ? { fields: createFixedFindingSchemaFields() }
+                : loadFindingSchema();
             this._view.webview.postMessage({
                 command: "set-finding-details",
                 details: entry,
-                schema: loadFindingSchema(),
+                schema,
                 title: entry.title,
             });
 
