@@ -47,22 +47,6 @@ export function validateFindingSchemaFields(fields: unknown): FindingSchemaValid
 }
 
 /**
- * Validates fixed Severity field options loaded from settings.
- */
-export function validateSeverityOptions(options: unknown): FindingSchemaValidationResult {
-    if (!Array.isArray(options)) {
-        return { errors: ["findingSchema.severityOptions must be an array."] };
-    }
-    if (options.length === 0) {
-        return { errors: ["findingSchema.severityOptions must contain at least one option."] };
-    }
-    if (options.some((option) => typeof option !== "string")) {
-        return { errors: ["findingSchema.severityOptions must contain only strings."] };
-    }
-    return { errors: [] };
-}
-
-/**
  * Validates conditional visibility rules for a schema field.
  */
 function validateVisibleWhen(field: FindingSchemaField, path: string, errors: string[]): void {
@@ -78,6 +62,21 @@ function validateVisibleWhen(field: FindingSchemaField, path: string, errors: st
     }
     if (field.visibleWhen.equals === undefined && field.visibleWhen.notEquals === undefined) {
         errors.push(`${path}.visibleWhen must define equals or notEquals.`);
+    }
+    validateVisibleWhenValue(field.visibleWhen.equals, `${path}.visibleWhen.equals`, errors);
+    validateVisibleWhenValue(field.visibleWhen.notEquals, `${path}.visibleWhen.notEquals`, errors);
+}
+
+/**
+ * Validates a single visibleWhen comparison value or an array of comparison values.
+ */
+function validateVisibleWhenValue(value: unknown, valuePath: string, errors: string[]): void {
+    if (value === undefined) {
+        return;
+    }
+    const values = Array.isArray(value) ? value : [value];
+    if (values.some((item) => Array.isArray(item))) {
+        errors.push(`${valuePath} must be a scalar value or an array of scalar values.`);
     }
 }
 

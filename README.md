@@ -162,7 +162,7 @@ When `.vscode/info.json` is present and valid, permalink commands resolve reposi
 
 ### Finding Schema
 
-The Finding Details panel renders fixed `title`, `severity`, and `description` fields plus any additional fields configured in `weAudit.findingSchema.fields`. The fixed Severity dropdown options can be customized with `weAudit.findingSchema.severityOptions`. Dynamic fields support `text`, `textarea`, `select`, `checkbox`, and `number` controls, with optional `visibleWhen` rules for conditionally showing fields based on other detail values.
+The Finding Details panel renders fixed `title` and `description` fields plus any additional fields configured in `weAudit.findingSchema.fields`. Severity is a configurable schema field; the default configuration includes a `severity` select field, but workspaces can replace it with their own options. Finding labels in the tree can be rendered from `weAudit.findingSchema.labelTemplate`, using placeholders such as `${title}`, `${severity}`, and custom detail fields. Dynamic fields support `text`, `textarea`, `select`, `checkbox`, and `number` controls, with optional `visibleWhen` rules for conditionally showing fields based on other detail values.
 
 ### Hide Findings
 You can hide all findings associated with a specific user by clicking on that user's name on the  `weAudit Files` panel.
@@ -212,7 +212,6 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 -   `weAudit.addFinding`: Add Selected Code To Findings: `cmd + 3`
 -   `weAudit.addNote`: Add Selected Code To Notes: `cmd + 4`
 -   `weAudit.deleteLocationUnderCursor`: Delete Finding Under Cursor: `cmd + 5`
--   `weAudit.editEntryUnderCursor`: Edit Finding Under Cursor: `cmd + 6`
 -   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
 -   `weAudit.addPartiallyAudited`: Mark Region As Reviewed: `cmd + shift + 7`
 -   `weAudit.copySelectedCodePermalink`: Copy Permalink (for the Selected Code Region): `cmd + 8`

@@ -94,7 +94,6 @@ Implemented in `test/ui/suite/commands.ui.test.ts`:
 - Create finding with a custom title (`weAudit: New Finding from Selection`)
 - Cancel finding creation (Escape in QuickInput)
 - Create note with a custom title (`weAudit: New Note from Selection`)
-- Edit finding under cursor (`weAudit: Edit Finding Under Cursor`)
 - Add an additional region via QuickPick (`weAudit: Add Region to a Finding`)
 - Mark region as reviewed and toggle off (`weAudit: Mark Region as Reviewed`)
 - Mark file as reviewed and toggle off (`weAudit: Mark File as Reviewed`)

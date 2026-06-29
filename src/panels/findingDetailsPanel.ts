@@ -15,8 +15,8 @@ export function activateFindingDetailsWebview(context: vscode.ExtensionContext):
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, title: string) => {
-            provider.setFindingDetails(entry, title);
+        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails) => {
+            provider.setFindingDetails(entry);
         }),
     );
 
@@ -59,13 +59,13 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
     /**
      * Set finding details in the webview
      */
-    public setFindingDetails(entry: EntryDetails, title: string): void {
+    public setFindingDetails(entry: EntryDetails): void {
         if (this._view) {
             this._view.webview.postMessage({
                 command: "set-finding-details",
-                details: { ...entry, title },
+                details: entry,
                 schema: loadFindingSchema(),
-                title: title,
+                title: entry.title,
             });
 
             // Set context to show the "Copy as Markdown" button in the view title

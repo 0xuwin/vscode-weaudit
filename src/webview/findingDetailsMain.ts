@@ -4,6 +4,7 @@ import { Checkbox, Dropdown, TextArea, TextField } from "@vscode/webview-ui-tool
 
 import type { DetailValue } from "../types";
 import type { FindingSchema, FindingSchemaField } from "../findingSchema/types";
+import { isDetailFieldVisible } from "../findingSchema/visibility";
 import type { SetFindingDetailsMessage, UpdateEntryMessage } from "./webviewMessageTypes";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption(), vsCodeTextArea(), vsCodeTextField());
@@ -215,26 +216,9 @@ function updateAllFieldVisibility(): void {
     for (const field of currentSchema.fields) {
         const row = document.querySelector<HTMLDivElement>(`[data-field-key="${field.key}"]`);
         if (row !== null) {
-            row.style.display = isFieldVisible(field) ? "" : "none";
+            row.style.display = isDetailFieldVisible(field, currentDetails) ? "" : "none";
         }
     }
-}
-
-/**
- * Returns whether a field should be visible for the current detail values.
- */
-function isFieldVisible(field: FindingSchemaField): boolean {
-    if (field.visibleWhen === undefined) {
-        return true;
-    }
-    const actual = currentDetails[field.visibleWhen.field];
-    if (field.visibleWhen.equals !== undefined && actual !== field.visibleWhen.equals) {
-        return false;
-    }
-    if (field.visibleWhen.notEquals !== undefined && actual === field.visibleWhen.notEquals) {
-        return false;
-    }
-    return true;
 }
 
 /**

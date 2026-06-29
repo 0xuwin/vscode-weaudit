@@ -1,29 +1,10 @@
 import { FindingDifficulty, FindingSeverity, FindingType } from "../types";
 import { FindingSchemaField } from "./types";
 
-/** Default severity options for the fixed Severity field. */
-export function createDefaultSeverityOptions(): string[] {
-    return [
-        "",
-        FindingSeverity.CodeQuality,
-        FindingSeverity.Informational,
-        FindingSeverity.Undetermined,
-        FindingSeverity.Low,
-        FindingSeverity.Medium,
-        FindingSeverity.High,
-    ];
-}
-
 /** Default fixed fields shown for every finding. */
-export function createFixedFindingSchemaFields(severityOptions: string[] = createDefaultSeverityOptions()): FindingSchemaField[] {
+export function createFixedFindingSchemaFields(): FindingSchemaField[] {
     return [
         { key: "title", label: "Title", type: "text", required: true },
-        {
-            key: "severity",
-            label: "Severity",
-            type: "select",
-            options: severityOptions,
-        },
         { key: "description", label: "Description", type: "textarea", placeholder: "The finding details", rows: 5 },
     ];
 }
@@ -32,6 +13,20 @@ export function createFixedFindingSchemaFields(severityOptions: string[] = creat
 export function createDefaultFindingSchemaFields(): FindingSchemaField[] {
     const hideForCodeQuality = { field: "severity", notEquals: FindingSeverity.CodeQuality };
     return [
+        {
+            key: "severity",
+            label: "Severity",
+            type: "select",
+            options: [
+                "",
+                FindingSeverity.CodeQuality,
+                FindingSeverity.Informational,
+                FindingSeverity.Undetermined,
+                FindingSeverity.Low,
+                FindingSeverity.Medium,
+                FindingSeverity.High,
+            ],
+        },
         {
             key: "difficulty",
             label: "Difficulty",

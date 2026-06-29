@@ -99,11 +99,6 @@
                 "icon": "$(pass)"
             },
             {
-                "command": "weAudit.editEntryTitle",
-                "title": "Edit Finding Title",
-                "icon": "$(edit)"
-            },
-            {
                 "command": "weAudit.editLocationEntry",
                 "title": "Edit Location Label",
                 "icon": "$(edit)"
@@ -163,10 +158,6 @@
             {
                 "command": "weAudit.addNote",
                 "title": "weAudit: New Note from Selection"
-            },
-            {
-                "command": "weAudit.editEntryUnderCursor",
-                "title": "weAudit: Edit Finding Under Cursor"
             },
             {
                 "command": "weAudit.deleteLocationUnderCursor",
@@ -265,11 +256,6 @@
                 "mac": "cmd+4"
             },
             {
-                "command": "weAudit.editEntryUnderCursor",
-                "key": "ctrl+alt+6",
-                "mac": "cmd+6"
-            },
-            {
                 "command": "weAudit.deleteLocationUnderCursor",
                 "key": "ctrl+alt+5",
                 "mac": "cmd+5"
@@ -340,10 +326,6 @@
         ],
         "menus": {
             "commandPalette": [
-                {
-                    "command": "weAudit.editEntryTitle",
-                    "when": "false"
-                },
                 {
                     "command": "weAudit.editLocationEntry",
                     "when": "false"
@@ -448,11 +430,6 @@
             ],
             "view/item/context": [
                 {
-                    "command": "weAudit.editEntryTitle",
-                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
-                    "group": "inline@1"
-                },
-                {
                     "command": "weAudit.copyEntryPermalink",
                     "when": "view == codeMarker && viewItem == additionalLocation",
                     "group": "inline@2"
@@ -465,22 +442,22 @@
                 {
                     "command": "weAudit.copyFindingAsMarkdown",
                     "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
-                    "group": "inline@4"
+                    "group": "inline@1"
                 },
                 {
                     "command": "weAudit.resolveFinding",
                     "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
-                    "group": "inline@5"
+                    "group": "inline@3"
                 },
                 {
                     "command": "weAudit.deleteFinding",
                     "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
-                    "group": "inline@6"
+                    "group": "inline@4"
                 },
                 {
                     "command": "weAudit.deleteLocation",
                     "when": "view == codeMarker && viewItem == additionalLocation",
-                    "group": "inline@6"
+                    "group": "inline@3"
                 },
                 {
                     "command": "weAudit.editLocationEntry",
@@ -546,26 +523,29 @@
                         "default": false,
                         "description": "Sort findings and notes alphabetically by name in the tree view."
                     },
-                    "weAudit.findingSchema.severityOptions": {
-                        "type": "array",
-                        "description": "Options shown in the fixed Severity dropdown.",
-                        "default": [
-                            "",
-                            "Code Quality",
-                            "Informational",
-                            "Undetermined",
-                            "Low",
-                            "Medium",
-                            "High"
-                        ],
-                        "items": {
-                            "type": "string"
-                        }
+                    "weAudit.findingSchema.labelTemplate": {
+                        "type": "string",
+                        "default": "${title}",
+                        "description": "Template used to render finding labels in the tree view. Supports placeholders like ${title}, ${severity}, and custom finding detail fields. Notes are not affected."
                     },
                     "weAudit.findingSchema.fields": {
                         "type": "array",
-                        "description": "Additional finding detail fields rendered after title, severity, and description.",
+                        "description": "Additional finding detail fields rendered after title and description. Define severity here if the workspace uses a severity taxonomy.",
                         "default": [
+                            {
+                                "key": "severity",
+                                "label": "Severity",
+                                "type": "select",
+                                "options": [
+                                    "",
+                                    "Code Quality",
+                                    "Informational",
+                                    "Undetermined",
+                                    "Low",
+                                    "Medium",
+                                    "High"
+                                ]
+                            },
                             {
                                 "key": "difficulty",
                                 "label": "Difficulty",

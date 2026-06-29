@@ -46,7 +46,6 @@ suite("Extension Activation", () => {
             "weAudit.deleteFinding",
             "weAudit.resolveFinding",
             "weAudit.restoreFinding",
-            "weAudit.editEntryTitle",
             "weAudit.copyEntryPermalink",
             "weAudit.copySelectedCodePermalink",
             "weAudit.toggleTreeViewMode",

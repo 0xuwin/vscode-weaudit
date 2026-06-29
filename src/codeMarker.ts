@@ -50,6 +50,9 @@ import { generateSourcePermalink } from "./permalinks/permalink";
 import { resolveProjectRepository } from "./projectConfig/resolution";
 import { getProjectConfigPath, projectConfigExists, readProjectConfig } from "./projectConfig/storage";
 import { isValidProjectConfig, validateProjectConfig } from "./projectConfig/validation";
+import { loadFindingLabelTemplate, loadFindingSchema } from "./findingSchema/settings";
+import { renderEntryDetailsMarkdown } from "./findingSchema/markdown";
+import { renderLabelTemplate } from "./findingSchema/labelTemplate";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
@@ -1307,10 +1310,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.deleteFinding(node);
         });
 
-        registerInitializedCommand("weAudit.editEntryTitle", (node: FullEntry) => {
-            void this.editEntryTitle(node);
-        });
-
         registerInitializedCommand("weAudit.editLocationEntry", (node: FullLocationEntry) => {
             void this.editLocationEntryDescription(node);
         });
@@ -1329,14 +1328,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         registerInitializedCommand("weAudit.restoreAllResolvedFindings", () => {
             this.restoreAllResolvedFindings();
-        });
-
-        registerInitializedCommand("weAudit.editEntryUnderCursor", () => {
-            const entry = this.getLocationUnderCursor();
-            if (entry) {
-                const toEdit = isLocationEntry(entry) ? entry.parentEntry : entry;
-                void this.editEntryTitle(toEdit);
-            }
         });
 
         registerInitializedCommand("weAudit.deleteLocationUnderCursor", () => {
@@ -1821,8 +1812,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             case "title":
             case "label": {
                 const title = String(value ?? "");
-                entry.label = title;
                 entry.details.title = title;
+                if (entry.entryType === EntryType.Finding) {
+                    this.applyFindingLabelTemplate(entry);
+                } else {
+                    entry.label = title;
+                }
                 this.refreshTree();
                 this.refreshAndDecorateEntry(entry);
                 treeView.reveal(entry);
@@ -1830,6 +1825,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
             default:
                 entry.details[field] = value;
+                this.applyFindingLabelTemplate(entry);
+                this.refreshTree();
+                this.refreshAndDecorateEntry(entry);
                 break;
         }
 
@@ -1843,6 +1841,17 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (isPersistent) {
             void this.updateSavedData(entry.author);
         }
+    }
+
+    /**
+     * Applies the configured label template to findings while leaving notes unchanged.
+     */
+    private applyFindingLabelTemplate(entry: FullEntry): void {
+        if (entry.entryType !== EntryType.Finding) {
+            return;
+        }
+        const renderedLabel = renderLabelTemplate(loadFindingLabelTemplate(), entry.details).trim();
+        entry.label = renderedLabel === "" ? entry.details.title : renderedLabel;
     }
 
     /**
@@ -2051,28 +2060,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     editor.revealRange(lastLine.range);
                 });
             });
-    }
-
-    /**
-     * Edit the label of a marked code region
-     * @param entry The entry to edit
-     */
-    async editEntryTitle(entry: FullEntry): Promise<void> {
-        const entryTypeLabel = entry.entryType === EntryType.Finding ? "finding" : "note";
-        const label = await vscode.window.showInputBox({
-            title: `Edit ${entryTypeLabel} title`,
-            value: entry.label,
-            ignoreFocusOut: true,
-        });
-        if (label === undefined) {
-            return;
-        }
-        entry.label = label;
-        entry.details.title = label;
-        treeView.reveal(entry);
-        this.refreshTree();
-        this.decorate();
-        void this.updateSavedData(entry.author);
     }
 
     async editLocationEntryDescription(locationEntry: FullLocationEntry): Promise<void> {
@@ -2291,62 +2278,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     private getEntryMarkdown(entry: FullEntry): string | void {
-        const auditPermalinks = [];
-        let locationDescriptions = "";
-
-        // Use .entries to iterate over entry.locations
-        for (const [i, location] of entry.locations.entries()) {
-            const remoteAndPermalink = this.getRemoteAndPermalink(location);
-            if (remoteAndPermalink === undefined) {
-                return;
-            }
-            auditPermalinks.push(remoteAndPermalink.permalink);
-
-            // Include location section if there's a label or captured snippet.
-            const codeSnippet = location.codeSnippet ?? "";
-            if (location.label !== "" || codeSnippet !== "") {
-                locationDescriptions += `\n\n---\n`;
-                locationDescriptions += `#### Location ${i + 1} ${location.label ?? ""}\n`;
-                if (codeSnippet !== "") {
-                    locationDescriptions += `\`\`\`\n${codeSnippet}\n\`\`\`\n\n`;
-                }
-                locationDescriptions += `${remoteAndPermalink.permalink}`;
-            }
-        }
-
-        // deduplicate the target paths
-        const locationSet: Set<string> = new Set();
+        let markdownBody = renderEntryDetailsMarkdown(entry.details, loadFindingSchema());
+        markdownBody += "## Code References\n";
         for (const location of entry.locations) {
-            // Multi-root may have colliding paths
-            if (this.workspaces.moreThanOneRoot()) {
-                const uniquePath = this.workspaces.createUniquePath(location.rootPath, location.path);
-                if (uniquePath !== undefined) {
-                    locationSet.add(uniquePath);
-                }
-            } else {
-                locationSet.add(location.path);
-            }
+            markdownBody += `\n${location.path}#L${location.startLine + 1}-${location.endLine + 1}\n`;
+            markdownBody += `\`\`\`\n${location.codeSnippet}\n\`\`\`\n`;
         }
-
-        const target = Array.from(locationSet).join(", ");
-        const permalinks = auditPermalinks.join("\n");
-        const severity = String(entry.details.severity ?? "");
-        const difficulty = String(entry.details.difficulty ?? "");
-        const findingType = String(entry.details.type ?? "");
-        const description = String(entry.details.description ?? "");
-        const exploit = String(entry.details.exploit ?? "");
-        const recommendation = String(entry.details.recommendation ?? "");
-
-        let markdownBody = `### Title\n${entry.label}\n\n`;
-        markdownBody += `### Severity\n${severity}\n\n`;
-        markdownBody += `### Difficulty\n${difficulty}\n\n`;
-        markdownBody += `### Type\n${findingType}\n\n`;
-        markdownBody += `### Target\n${target}\n\n`;
-        markdownBody += `## Description\n${description}${locationDescriptions}\n\n`;
-        markdownBody += `## Exploit Scenario\n${exploit}\n\n`;
-        markdownBody += `## Recommendations\n${recommendation}\n\n\n`;
-
-        markdownBody += `Permalink:\n${permalinks}\n\n`;
+        markdownBody += "\n";
         return markdownBody;
     }
 
@@ -2550,11 +2488,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         const intersectedIdx = this.getIntersectingTreeEntryIndex(location, entryType);
 
-        // if we found an entry, edit the description
+        // If we found an entry, reveal it so its title can be edited in Finding Details.
         if (intersectedIdx !== -1) {
             const entry = this.treeEntries[intersectedIdx];
-            // editEntryTitle calls updateSavedData so we don't need to call it here
-            await this.editEntryTitle(entry);
+            void treeView.reveal(entry, { select: true });
         } else {
             // otherwise, add it to the tree entries
             // create title depending on the entry type
@@ -2571,6 +2508,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 locations: locations,
                 details: { ...createDefaultEntryDetails(), title },
             };
+            this.applyFindingLabelTemplate(entry);
             this.treeEntries.push(entry);
             void this.updateSavedData(this.username);
         }
@@ -3937,7 +3875,7 @@ export class AuditMarker {
         }
 
         // Fills the Finding details webview with the currently selected entry details
-        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label);
+        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details);
     }
 
     /**

@@ -275,24 +275,6 @@ describe("weAudit Command UI Tests", () => {
     });
 
     describe("Editing & multi-region commands", () => {
-        it("edits the finding under the cursor", async function () {
-            const originalTitle = `Editable Finding ${Date.now()}`;
-            await createTestFinding(workbench, originalTitle, { start: 18, end: 19 });
-            await moveCursorTo(18);
-            await workbench.executeCommand("weAudit: Edit Finding Under Cursor");
-            const input = await InputBox.create();
-            const updatedTitle = `Edited Finding Title ${Date.now()}`;
-            await input.setText(updatedTitle);
-            await input.confirm();
-            const updated = await waitForCondition(async () => {
-                const entries = await readSerializedEntries();
-                const hasUpdated = entries?.some((entry) => entry.label === updatedTitle) ?? false;
-                const hasOriginal = entries?.some((entry) => entry.label === originalTitle) ?? false;
-                return hasUpdated && !hasOriginal;
-            });
-            expect(updated).to.equal(true);
-        });
-
         it("adds an additional region using the quick pick", async function () {
             const title = `Multi-region Finding ${Date.now()}`;
             // Avoid reusing line ranges from other tests so this selection never intersects
