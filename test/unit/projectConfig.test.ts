@@ -23,7 +23,7 @@ function createValidProjectConfig(): ProjectConfig {
             {
                 name: "core",
                 root: "packages/core",
-                remote: "https://github.com/example/core",
+                remote: "https://example.com/example/core",
                 scope: {
                     include: ["contracts/**/*.sol"],
                     exclude: ["test/**"],
@@ -132,7 +132,7 @@ describe("projectConfig", () => {
     describe("resolution", () => {
         it("resolves repositories with the longest root-prefix match", () => {
             const config = createValidProjectConfig();
-            config.repositories.push({ name: "root", root: ".", remote: "https://github.com/example/root", versions: [{ name: "Current", commit: "root" }] });
+            config.repositories.push({ name: "root", root: ".", remote: "https://example.com/example/root", versions: [{ name: "Current", commit: "root" }] });
 
             const resolved = resolveProjectRepository(config, {
                 path: "packages/core/contracts/Token.sol",

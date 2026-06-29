@@ -27,7 +27,6 @@ import {
     createDefaultEntryDetails,
     createLocationEntry,
     isPathOrganizerEntry,
-    FindingSeverity,
     EntryType,
     RemoteAndPermalink,
     AUDIT_STATE_SCHEMA_VERSION,
@@ -49,7 +48,7 @@ import { normalizePathForOS } from "./utilities/normalizePath";
 import { readAuditState, writeAuditState } from "./auditState/storage";
 import { generateSourcePermalink } from "./permalinks/permalink";
 import { resolveProjectRepository } from "./projectConfig/resolution";
-import { getProjectConfigPath, readProjectConfig } from "./projectConfig/storage";
+import { getProjectConfigPath, projectConfigExists, readProjectConfig } from "./projectConfig/storage";
 import { isValidProjectConfig, validateProjectConfig } from "./projectConfig/validation";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
@@ -65,9 +64,6 @@ class WARoot {
     private partiallyAuditedFiles: PartiallyAuditedFile[];
     readonly rootPath: string;
     private rootLabel: string;
-    public gitRemote: string;
-    public gitSha: string;
-    public clientRemote: string;
     private username: string;
 
     // An array corresponding to all .weaudit file in the .vscode folder of this workspace root
@@ -76,12 +72,6 @@ class WARoot {
 
     // markedFilesDayLog contains a map associating a string representing a date to a file path.
     public markedFilesDayLog: Map<string, string[]>;
-
-    /** The GitHub issue number designated for Code Quality comments in this workspace root. */
-    public codeQualityIssueNumber: number | undefined;
-
-    // firstTimeRequestingClientRemote is used to prevent repeatedly asking for the client remote
-    private firstTimeRequestingClientRemote = true;
 
     constructor(wsPath: string, wsLabel: string) {
         this.auditedFiles = [];
@@ -93,11 +83,6 @@ class WARoot {
                 `weAudit: Warning! It looks like your root path ${this.rootPath} is at the root of your filesystem. This is deeply cursed.`,
             );
         }
-
-        // We do not load anything here, because that is done by the CodeMarker or MultiRootManager
-        this.clientRemote = "";
-        this.gitRemote = "";
-        this.gitSha = "";
 
         this.markedFilesDayLog = new Map<string, string[]>();
         this.loadDayLogFromFile();
@@ -251,251 +236,6 @@ class WARoot {
             }
             this.rootLabel = label;
         }
-    }
-
-    /**
-     * Saves the client's remote repository to the current user's file
-     */
-    persistClientRemote(): void {
-        vscode.commands.executeCommand(
-            "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
-            this.clientRemote,
-            this.gitRemote,
-            this.gitSha,
-        );
-        const vscodeFolder = path.join(this.rootPath, ".vscode");
-        // create .vscode folder if it doesn't exist
-        if (!fs.existsSync(vscodeFolder)) {
-            fs.mkdirSync(vscodeFolder);
-        }
-
-        void this.updateSavedData(this.username);
-    }
-
-    /**
-     * Saves the audit remote repository to the current user's file
-     */
-    persistAuditRemote(): void {
-        vscode.commands.executeCommand(
-            "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
-            this.clientRemote,
-            this.gitRemote,
-            this.gitSha,
-        );
-        const vscodeFolder = path.join(this.rootPath, ".vscode");
-        // create .vscode folder if it doesn't exist
-        if (!fs.existsSync(vscodeFolder)) {
-            fs.mkdirSync(vscodeFolder);
-        }
-
-        void this.updateSavedData(this.username);
-    }
-
-    /**
-     * Saves the relevant git hash to the current user's file
-     */
-    persistGitHash(): void {
-        vscode.commands.executeCommand(
-            "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
-            this.clientRemote,
-            this.gitRemote,
-            this.gitSha,
-        );
-        const vscodeFolder = path.join(this.rootPath, ".vscode");
-        // create .vscode folder if it doesn't exist
-        if (!fs.existsSync(vscodeFolder)) {
-            fs.mkdirSync(vscodeFolder);
-        }
-
-        void this.updateSavedData(this.username);
-    }
-
-    /**
-     * Find the client's remote repository
-     * @returns The client's remote repository, or undefined if it could not be found
-     */
-    async findClientRemote(): Promise<string | undefined> {
-        if (this.firstTimeRequestingClientRemote && this.clientRemote === "") {
-            await this.editClientRemote();
-            this.firstTimeRequestingClientRemote = false;
-        }
-        return this.clientRemote;
-    }
-
-    /**
-     * Find the git remote for the current workspace
-     */
-    async findGitRemote(): Promise<string | undefined> {
-        if (this.gitRemote !== "") {
-            return this.gitRemote;
-        }
-
-        const gitPath = path.join(this.rootPath, ".git");
-        if (!fs.existsSync(gitPath)) {
-            return;
-        }
-        const gitConfig = fs.readFileSync(gitPath + "/config", "utf8");
-        if (!gitConfig) {
-            return;
-        }
-        const remoteUrl = gitConfig.match(/url = (.*)/g);
-        if (!remoteUrl) {
-            return;
-        }
-
-        // try to find a githubOrganizationName remote
-        const githubOrganizationName: string = vscode.workspace.getConfiguration("weAudit").get("general.githubOrganizationName")!;
-        for (const remote of remoteUrl) {
-            if (!remote.includes(githubOrganizationName)) {
-                continue;
-            }
-            let remotePath = remote.split("=")[1].trim();
-            if (remotePath.startsWith("git@github.com:")) {
-                remotePath = remotePath.replace("git@github.com:", "https://github.com/");
-            }
-            if (!remotePath.includes(`github.com/${githubOrganizationName}/`)) {
-                return;
-            }
-            if (remotePath.endsWith(".git")) {
-                remotePath = remotePath.slice(0, -".git".length);
-            }
-            this.gitRemote = remotePath;
-            this.persistAuditRemote();
-            return remotePath;
-        }
-
-        if (remoteUrl.length === 0) {
-            await this.editAuditRemote();
-            return this.gitRemote;
-        }
-
-        // if no githubOrganizationName remote was found, use the first remote
-        let remotePath = remoteUrl[0].split("=")[1].trim();
-        if (remotePath.startsWith("git@github.com:")) {
-            remotePath = remotePath.replace("git@github.com:", "https://github.com/");
-        }
-        if (remotePath.endsWith(".git")) {
-            remotePath = remotePath.slice(0, -".git".length);
-        }
-        this.gitRemote = remotePath;
-        // confirm with the user if this is the repo they want to use
-        await this.editAuditRemote();
-
-        // if we don't have a githubOrganizationName remote,
-        // it means that the client remote is probably the same as the git remote
-        this.clientRemote = remotePath;
-
-        void this.updateSavedData(this.username);
-        return this.gitRemote;
-    }
-
-    /**
-     * Find the git sha for the current workspace
-     * @returns The git sha or undefined if it could not be found
-     */
-    findGitSha(): string | undefined {
-        if (this.gitSha !== "") {
-            return this.gitSha;
-        }
-
-        const gitPath = path.join(this.rootPath, ".git", "HEAD");
-        if (!fs.existsSync(gitPath)) {
-            return;
-        }
-
-        let gitHead = fs.readFileSync(gitPath, "utf8");
-        if (!gitHead) {
-            return;
-        }
-
-        const headPath = gitHead.match(/ref: (.*)/);
-        if (!headPath) {
-            // probably a detached head
-            // check if gitHead has the correct hash length
-            gitHead = gitHead.trim();
-            if (gitHead.length !== 40) {
-                console.error("[weAudit] Could not determine the git sha. Seemed to be a detached head but the hash length was not 40: " + gitHead);
-                return;
-            }
-            this.gitSha = gitHead.trim();
-            this.persistGitHash();
-            return this.gitSha;
-        }
-
-        const shaPath = path.join(this.rootPath, ".git", headPath[1]);
-        if (!fs.existsSync(shaPath)) {
-            return;
-        }
-        const shaCommit = fs.readFileSync(shaPath, "utf8");
-        if (!shaCommit) {
-            return;
-        }
-        this.gitSha = shaCommit.trim();
-        this.persistGitHash();
-        return this.gitSha;
-    }
-
-    /**
-     * Edit the client's remote repository
-     */
-    async editClientRemote(): Promise<void> {
-        const clientRemote = await vscode.window.showInputBox({
-            title: `Edit Client Repository for ${this.rootLabel}:`,
-            value: this.clientRemote,
-            ignoreFocusOut: true,
-        });
-        if (clientRemote === undefined) {
-            return;
-        }
-        this.clientRemote = clientRemote;
-        this.persistClientRemote();
-    }
-
-    /**
-     * Edit the audit repository
-     */
-    async editAuditRemote(): Promise<void> {
-        const auditRemote = await vscode.window.showInputBox({
-            title: `Edit Audit Repository for ${this.rootLabel}:`,
-            value: this.gitRemote,
-            ignoreFocusOut: true,
-        });
-        if (auditRemote === undefined) {
-            return;
-        }
-        this.gitRemote = auditRemote;
-        this.persistAuditRemote();
-    }
-
-    /**
-     * Edit the git sha
-     */
-    async editGitHash(): Promise<void> {
-        const gitSha = await vscode.window.showInputBox({ title: `Edit Git Commit Hash for ${this.rootLabel}:`, value: this.gitSha, ignoreFocusOut: true });
-        if (gitSha === undefined) {
-            return;
-        }
-        this.gitSha = gitSha;
-        this.persistGitHash();
-    }
-
-    /**
-     * Setup the client remote, audit remote and git hash
-     */
-    async setupRepositories(): Promise<void> {
-        await this.findGitRemote();
-        await this.editAuditRemote();
-
-        await this.editClientRemote();
-
-        this.findGitSha();
-        await this.editGitHash();
-
-        // persist the data
-        void this.updateSavedData(this.username);
     }
 
     /**
@@ -755,15 +495,20 @@ class WARoot {
                 endLine--;
             }
 
-            // github preview does not show the preview if the last document line is empty
-            // so we decrement it by one
+            // Markdown previews do not show the preview if the last document line is empty,
+            // so we decrement it by one.
             if (endLine === editor.document.lineCount - 1 && editor.document.lineAt(endLine).text === "") {
                 // ensure that we don't go before the start line
                 endLine = Math.max(endLine - 1, startLine);
             }
 
+            const codeSnippet = [];
+            for (let line = startLine; line <= endLine; line++) {
+                codeSnippet.push(editor.document.lineAt(line).text);
+            }
+
             // TODO: error if not in this workspace root?
-            return { path: relativePath, startLine, endLine, label: "", description: "", rootPath: this.rootPath };
+            return { path: relativePath, startLine, endLine, label: "", codeSnippet: codeSnippet.join("\n"), rootPath: this.rootPath };
         });
     }
 
@@ -876,7 +621,7 @@ class WARoot {
             this,
         );
 
-        // Remove the root path for backwards compatibility. It is implicit in the location of the saved file anyway.
+        // Remove rootPath before saving. It is implicit in the location of the saved file.
         let reducedEntries = filteredEntries.map(
             (fullEntry) =>
                 ({
@@ -891,7 +636,7 @@ class WARoot {
                                 startLine: location.startLine,
                                 endLine: location.endLine,
                                 label: location.label,
-                                description: location.description,
+                                codeSnippet: location.codeSnippet,
                             }) as Location,
                     ),
                 }) as Entry,
@@ -910,7 +655,7 @@ class WARoot {
                                 startLine: location.startLine,
                                 endLine: location.endLine,
                                 label: location.label,
-                                description: location.description,
+                                codeSnippet: location.codeSnippet,
                             }) as Location,
                     ),
                 }) as Entry,
@@ -969,27 +714,6 @@ class WARoot {
             writeAuditState(fileName, serializedObj);
         }
     }
-
-    /**
-     * Update the git configuration of this workspace root.
-     * @param clientRemote The client remote to be configured.
-     * @param auditRemote The audit remote to be configured.
-     * @param gitSha The git SHA digest to be configured.
-     * @param cqIssueNumber The Code Quality issue number (as string), or empty to clear.
-     */
-    updateGitConfig(clientRemote: string, auditRemote: string, gitSha: string, cqIssueNumber?: string): void {
-        this.clientRemote = clientRemote;
-        this.gitRemote = auditRemote;
-        this.gitSha = gitSha;
-
-        if (cqIssueNumber !== undefined) {
-            const parsed = Number(cqIssueNumber);
-            this.codeQualityIssueNumber = cqIssueNumber !== "" && Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
-        }
-
-        // persist the data
-        void this.updateSavedData(this.username);
-    }
 }
 
 /**
@@ -1011,13 +735,6 @@ class MultiRootManager {
         this.pathToMultipleRootMap = new Map<string, [WARoot, string][]>();
         this.roots = this.setupRoots();
 
-        // We tell the Git Config Webview about the roots
-        // MultiConfig will request the roots by itself when
-        // weAudit.findAndLoadConfigurationFiles is executed by the CodeMarker
-        vscode.commands.executeCommand(
-            "weAudit.setGitConfigRoots",
-            this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
-        );
         // Add a listener for changes to the roots
         const listener = async (event: vscode.WorkspaceFoldersChangeEvent): Promise<void> => {
             // Any removed or added roots will execute weAudit.toggleSavedFindings, which will cause a refresh
@@ -1054,12 +771,6 @@ class MultiRootManager {
 
             // Refresh the configuration files: This will request the roots and currently selected configurations
             await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-
-            // Tell the git Config WebView that there are new roots
-            await vscode.commands.executeCommand(
-                "weAudit.setGitConfigRoots",
-                this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
-            );
         };
         const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
         context.subscriptions.push(disposable);
@@ -1233,66 +944,6 @@ class MultiRootManager {
         }
         const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(wsRootPath);
         return wsRoot;
-    }
-
-    /**
-     * Prompts the user to select a WARoot and edit the client remote of that WARoot.
-     * @returns The Promise of editing the client remote.
-     */
-    async editClientRemote(): Promise<void> {
-        const wsRoot = await this.selectRoot();
-        if (wsRoot === undefined) {
-            return;
-        }
-        return wsRoot.editClientRemote();
-    }
-
-    /**
-     * Prompts the user to select a WARoot and edit the audit remote of that WARoot.
-     * @returns The Promise of editing the audit remote.
-     */
-    async editAuditRemote(): Promise<void> {
-        const wsRoot = await this.selectRoot();
-        if (wsRoot === undefined) {
-            return;
-        }
-        return wsRoot.editAuditRemote();
-    }
-
-    /**
-     * Prompts the user to select a WARoot and edit the git hash of that WARoot.
-     * @returns The Promise of editing the git hash.
-     */
-    async editGitHash(): Promise<void> {
-        const wsRoot = await this.selectRoot();
-        if (wsRoot === undefined) {
-            return;
-        }
-        return wsRoot.editGitHash();
-    }
-
-    /**
-     * Goes through all workspace roots and sets up the repositories.
-     */
-    async setupRepositories(): Promise<void> {
-        for (const wsRoot of this.roots) {
-            await wsRoot.setupRepositories();
-        }
-    }
-
-    /**
-     * Configures the git settings of the WARoot corresponding to the provided root path.
-     * @param rootPath The root path corresponding to the WARoot.
-     * @param clientRemote The client remote to be configured.
-     * @param auditRemote The audit remote to be configured.
-     * @param gitSha the git SHA to be configured.
-     */
-    updateGitConfig(rootPath: string, clientRemote: string, auditRemote: string, gitSha: string, cqIssueNumber?: string): void {
-        const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(rootPath);
-        if (wsRoot === undefined) {
-            return;
-        }
-        return wsRoot.updateGitConfig(clientRemote, auditRemote, gitSha, cqIssueNumber);
     }
 
     /**
@@ -1586,62 +1237,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
 
-        // Fill the Git configuration webview with the current git configuration
-        vscode.commands.registerCommand(
-            "weAudit.pushGitConfigView",
-            (rootPath?: string) => {
-                let wsRoot, _relativePath;
-                if (rootPath === undefined) {
-                    // If there is no rootPath, this is a request to repopulate the webview on webview-ready
-                    const wsRoots = this.workspaces.getRoots();
-                    if (wsRoots.length === 0) {
-                        vscode.window.showErrorMessage(`weAudit: Error pushing git configuration. There are no workspace roots.`);
-                        return;
-                    }
-                    wsRoot = wsRoots[0];
-                } else {
-                    // We should populate it with the requested workspace root
-                    [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(rootPath);
-                    if (wsRoot === undefined) {
-                        vscode.window.showErrorMessage(`weAudit: Error pushing git configuration. The path ${rootPath} is not a current workspace root.`);
-                        return;
-                    }
-                }
-                vscode.commands.executeCommand(
-                    "weAudit.setGitConfigView",
-                    { rootPath: wsRoot.rootPath, rootLabel: wsRoot.getRootLabel() } as RootPathAndLabel,
-                    wsRoot.clientRemote,
-                    wsRoot.gitRemote,
-                    wsRoot.gitSha,
-                    wsRoot.codeQualityIssueNumber !== undefined ? String(wsRoot.codeQualityIssueNumber) : "",
-                );
-            },
-            this,
-        );
-
-        // Push the workspace roots to the git configuration webview
-        vscode.commands.registerCommand("weAudit.getGitConfigRoots", () => {
-            vscode.commands.executeCommand(
-                "weAudit.setGitConfigRoots",
-                this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
-            );
-        });
-
-        // Given a root path, return the root path of the next or previous root
-        vscode.commands.registerCommand("weAudit.nextRoot", (rootPath: string, forward: boolean) => {
-            const roots = this.workspaces.getRoots();
-            if (roots.length < 2) {
-                return rootPath;
-            }
-            let idx = roots.map((root) => root.rootPath).indexOf(rootPath);
-            if (idx === -1) {
-                vscode.commands.executeCommand("weAudit.getGitConfigRoots");
-                idx = 0;
-            }
-            idx = forward ? (idx + 1) % roots.length : (idx - 1 + roots.length) % roots.length;
-            return roots[idx].rootPath;
-        });
-
         this.decorate();
 
         // Pushes the roots and currently selected configurations to the MultiConfig
@@ -1653,68 +1248,90 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
         });
 
-        vscode.commands.registerCommand("weAudit.toggleAudited", () => {
+        const registerInitializedCommand = <T extends unknown[]>(command: string, callback: (...args: T) => unknown): void => {
+            context.subscriptions.push(
+                vscode.commands.registerCommand(command, (...args: T) => {
+                    if (!this.ensureActiveWorkspaceInitialized()) {
+                        return;
+                    }
+                    return callback(...args);
+                }),
+            );
+        };
+
+        const registerInitializedTextEditorCommand = (command: string, callback: () => unknown): void => {
+            context.subscriptions.push(
+                vscode.commands.registerTextEditorCommand(command, () => {
+                    if (!this.ensureActiveWorkspaceInitialized()) {
+                        return;
+                    }
+                    return callback();
+                }),
+            );
+        };
+
+        registerInitializedCommand("weAudit.toggleAudited", () => {
             this.toggleAudited();
         });
 
-        vscode.commands.registerCommand("weAudit.addPartiallyAudited", () => {
+        registerInitializedCommand("weAudit.addPartiallyAudited", () => {
             this.addPartiallyAudited();
         });
 
-        vscode.commands.registerCommand("weAudit.toggleFindingsHighlighting", () => {
+        registerInitializedCommand("weAudit.toggleFindingsHighlighting", () => {
             this.decorationsEnabled = !this.decorationsEnabled;
             this.decorate();
         });
 
-        vscode.commands.registerCommand("weAudit.toggleTreeViewMode", () => {
+        registerInitializedCommand("weAudit.toggleTreeViewMode", () => {
             this.toggleTreeViewMode();
         });
 
-        vscode.commands.registerCommand("weAudit.addFinding", () => {
+        registerInitializedCommand("weAudit.addFinding", () => {
             this.addFinding();
         });
 
-        vscode.commands.registerCommand("weAudit.addNote", () => {
+        registerInitializedCommand("weAudit.addNote", () => {
             this.addNote();
         });
 
-        vscode.commands.registerCommand("weAudit.navigateToNextPartiallyAuditedRegion", () => {
+        registerInitializedCommand("weAudit.navigateToNextPartiallyAuditedRegion", () => {
             this.navigateToNextPartiallyAuditedRegion();
         });
 
-        vscode.commands.registerCommand("weAudit.resolveFinding", (node: FullEntry) => {
+        registerInitializedCommand("weAudit.resolveFinding", (node: FullEntry) => {
             this.resolveFinding(node);
         });
 
-        vscode.commands.registerCommand("weAudit.deleteFinding", (node: FullEntry) => {
+        registerInitializedCommand("weAudit.deleteFinding", (node: FullEntry) => {
             this.deleteFinding(node);
         });
 
-        vscode.commands.registerCommand("weAudit.editEntryTitle", (node: FullEntry) => {
+        registerInitializedCommand("weAudit.editEntryTitle", (node: FullEntry) => {
             void this.editEntryTitle(node);
         });
 
-        vscode.commands.registerCommand("weAudit.editLocationEntry", (node: FullLocationEntry) => {
+        registerInitializedCommand("weAudit.editLocationEntry", (node: FullLocationEntry) => {
             void this.editLocationEntryDescription(node);
         });
 
-        vscode.commands.registerCommand("weAudit.restoreFinding", (node: FullEntry) => {
+        registerInitializedCommand("weAudit.restoreFinding", (node: FullEntry) => {
             this.restoreFinding(node);
         });
 
-        vscode.commands.registerCommand("weAudit.deleteResolvedFinding", (node: FullEntry) => {
+        registerInitializedCommand("weAudit.deleteResolvedFinding", (node: FullEntry) => {
             this.deleteResolvedFinding(node);
         });
 
-        vscode.commands.registerCommand("weAudit.deleteAllResolvedFinding", () => {
+        registerInitializedCommand("weAudit.deleteAllResolvedFinding", () => {
             this.deleteAllResolvedFindings();
         });
 
-        vscode.commands.registerCommand("weAudit.restoreAllResolvedFindings", () => {
+        registerInitializedCommand("weAudit.restoreAllResolvedFindings", () => {
             this.restoreAllResolvedFindings();
         });
 
-        vscode.commands.registerCommand("weAudit.editEntryUnderCursor", () => {
+        registerInitializedCommand("weAudit.editEntryUnderCursor", () => {
             const entry = this.getLocationUnderCursor();
             if (entry) {
                 const toEdit = isLocationEntry(entry) ? entry.parentEntry : entry;
@@ -1722,7 +1339,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         });
 
-        vscode.commands.registerCommand("weAudit.deleteLocationUnderCursor", () => {
+        registerInitializedCommand("weAudit.deleteLocationUnderCursor", () => {
             const entry = this.getLocationUnderCursor();
             if (entry) {
                 const toDelete = isEntry(entry) ? createLocationEntry(entry.locations[0], entry) : entry;
@@ -1730,58 +1347,27 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         });
 
-        vscode.commands.registerCommand("weAudit.copyEntryPermalink", (entry: FullEntry | FullLocationEntry) => {
+        registerInitializedCommand("weAudit.copyEntryPermalink", (entry: FullEntry | FullLocationEntry) => {
             void this.copyEntryPermalink(entry);
         });
 
-        vscode.commands.registerCommand("weAudit.copyEntryPermalinks", (entry: FullEntry) => {
+        registerInitializedCommand("weAudit.copyEntryPermalinks", (entry: FullEntry) => {
             void this.copyEntryPermalinks(entry);
         });
 
-        vscode.commands.registerTextEditorCommand("weAudit.copySelectedCodePermalink", () => {
+        registerInitializedTextEditorCommand("weAudit.copySelectedCodePermalink", () => {
             void this.copySelectedCodePermalink(Repository.Audit);
         });
 
-        vscode.commands.registerTextEditorCommand("weAudit.copySelectedCodeClientPermalink", () => {
+        registerInitializedTextEditorCommand("weAudit.copySelectedCodeClientPermalink", () => {
             void this.copySelectedCodePermalink(Repository.Client);
         });
 
-        vscode.commands.registerCommand("weAudit.editClientRemote", () => {
-            void this.workspaces.editClientRemote();
-        });
-
-        vscode.commands.registerCommand("weAudit.editAuditRemote", () => {
-            void this.workspaces.editAuditRemote();
-        });
-
-        vscode.commands.registerCommand("weAudit.editGitHash", () => {
-            void this.workspaces.editGitHash();
-        });
-
-        vscode.commands.registerCommand("weAudit.editCodeQualityIssueNumber", () => {
-            void this.editCodeQualityIssueNumber();
-        });
-
-        // Set up the repositories for one workspace root specified by its path
-        vscode.commands.registerCommand("weAudit.setupRepositoriesOne", (rootPath: string) => {
-            const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(rootPath);
-            if (wsRoot === undefined) {
-                vscode.window.showErrorMessage(`weAudit: Error setting up repositories. The path ${rootPath} is not a current workspace root.`);
-                return;
-            }
-            return wsRoot.setupRepositories();
-        });
-
-        // Set up the repositories for all workspace roots
-        vscode.commands.registerCommand("weAudit.setupRepositoriesAll", () => {
-            void this.workspaces.setupRepositories();
-        });
-
         /**
-         * Open a github issue. Warning: this command is used by Sarif Explorer and should at least accept Entry types.
+         * Copies finding Markdown. Warning: this command is used by Sarif Explorer and should at least accept Entry types.
          * Sarif explorer will always provide absolute paths as location paths, so it should be possible to find the corresponding workspace root.
          *  */
-        vscode.commands.registerCommand("weAudit.openGithubIssue", (entry: Entry | FullEntry | FullLocationEntry) => {
+        registerInitializedCommand("weAudit.copyFindingAsMarkdown", (entry: Entry | FullEntry | FullLocationEntry) => {
             let actualEntries: FullEntry[];
             if (isOldEntry(entry)) {
                 // This is the Sarif Explorer case. Location paths are absolute paths.
@@ -1790,7 +1376,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 for (const loc of entry.locations) {
                     const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
                     if (wsRoot === undefined) {
-                        vscode.window.showErrorMessage(`Failed to open a GitHub issue. The file ${loc.path} is not in any workspace root.`);
+                        vscode.window.showErrorMessage(`Failed to copy finding as Markdown. The file ${loc.path} is not in any workspace root.`);
                         return;
                     }
                 }
@@ -1811,7 +1397,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     startLine: loc.startLine,
                                     endLine: loc.endLine,
                                     label: loc.label,
-                                    description: loc.description,
+                                    codeSnippet: loc.codeSnippet,
                                     rootPath: wsRoot!.rootPath,
                                 } as FullLocation;
                             }),
@@ -1826,7 +1412,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     const fullPath = path.join(loc.rootPath, loc.path);
                     const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.rootPath);
                     if (wsRoot === undefined) {
-                        vscode.window.showErrorMessage(`Failed to open a GitHub issue. The file ${fullPath} is not in any workspace root.`);
+                        vscode.window.showErrorMessage(`Failed to copy finding as Markdown. The file ${fullPath} is not in any workspace root.`);
                         return;
                     }
                 }
@@ -1834,13 +1420,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 actualEntries = [actualEntry];
             }
 
-            for (const actualEntry of actualEntries) {
-                if (actualEntry.details.severity === FindingSeverity.CodeQuality) {
-                    void this.openCodeQualityComment(actualEntry);
-                } else {
-                    void this.openGithubIssue(actualEntry);
-                }
-            }
+            void this.copyEntriesAsMarkdown(actualEntries);
         });
 
         // This command takes a configuration file, toggles its current selection, and shows/hides the corresponding findings
@@ -1869,19 +1449,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         });
 
-        vscode.commands.registerCommand("weAudit.updateCurrentSelectedEntry", (field: string, value: DetailValue, isPersistent: boolean) => {
+        registerInitializedCommand("weAudit.updateCurrentSelectedEntry", (field: string, value: DetailValue, isPersistent: boolean) => {
             this.updateCurrentlySelectedEntry(field, value, isPersistent);
         });
 
-        vscode.commands.registerCommand(
-            "weAudit.updateGitConfig",
-            (rootPath: string, clientRemote: string, auditRemote: string, gitSha: string, cqIssueNumber?: string) => {
-                this.workspaces.updateGitConfig(rootPath, clientRemote, auditRemote, gitSha, cqIssueNumber);
-            },
-        );
-
         // This command is used by Sarif Explorer and requires to accept Entry for backwards compatibility
-        vscode.commands.registerCommand("weAudit.externallyLoadFindings", (results: Entry[]) => {
+        registerInitializedCommand("weAudit.externallyLoadFindings", (results: Entry[]) => {
             // First check that all locations are inside one of the workspace roots:
             for (const result of results) {
                 for (const loc of result.locations) {
@@ -1927,7 +1500,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                 startLine: loc.startLine,
                                 endLine: loc.endLine,
                                 label: loc.label,
-                                description: loc.description,
+                                codeSnippet: loc.codeSnippet,
                                 rootPath: wsRoot!.rootPath,
                             } as FullLocation;
                         }),
@@ -1937,12 +1510,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.externallyLoadFindings(fullResults);
         });
 
-        vscode.commands.registerCommand("weAudit.showMarkedFilesDayLog", () => {
+        registerInitializedCommand("weAudit.showMarkedFilesDayLog", () => {
             this.showMarkedFilesDayLog();
         });
 
         // This command is only used by Sarif Explorer, which will provide a location with an absolute path
-        vscode.commands.registerCommand("weAudit.getClientPermalink", (location: Location) => {
+        registerInitializedCommand("weAudit.getClientPermalink", (location: Location) => {
             const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(location.path);
             if (wsRoot === undefined) {
                 vscode.window.showErrorMessage(`Failed to get Client Permalink. The file ${location.path} is not in any workspace root.`);
@@ -1954,30 +1527,30 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 startLine: location.startLine,
                 endLine: location.endLine,
                 label: location.label,
-                description: location.description,
+                codeSnippet: location.codeSnippet,
                 rootPath: wsRoot.rootPath,
             } as FullLocation;
 
             return this.getClientPermalink(fullLocation);
         });
 
-        vscode.commands.registerCommand("weAudit.addRegionToAnEntry", () => {
+        registerInitializedCommand("weAudit.addRegionToAnEntry", () => {
             void this.addRegionToAnEntry();
         });
 
-        vscode.commands.registerCommand("weAudit.addRegionToAnEntryWithLabel", () => {
+        registerInitializedCommand("weAudit.addRegionToAnEntryWithLabel", () => {
             void this.addRegionToAnEntryWithLabel();
         });
 
-        vscode.commands.registerCommand("weAudit.deleteLocation", (entry: FullLocationEntry) => {
+        registerInitializedCommand("weAudit.deleteLocation", (entry: FullLocationEntry) => {
             this.deleteLocation(entry);
         });
 
-        vscode.commands.registerCommand("weAudit.showFindingsSearchBar", () => {
+        registerInitializedCommand("weAudit.showFindingsSearchBar", () => {
             void this.showFindingsSearchBar();
         });
 
-        vscode.commands.registerCommand("weAudit.exportFindingsInMarkdown", () => {
+        registerInitializedCommand("weAudit.exportFindingsInMarkdown", () => {
             void this.exportFindingsInMarkdown();
         });
 
@@ -1987,13 +1560,57 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
 
         // ======== PUBLIC INTERFACE ========
-        vscode.commands.registerCommand("weAudit.getCodeToCopyFromLocation", (entry: FullEntry | FullLocationEntry) => {
+        registerInitializedCommand("weAudit.getCodeToCopyFromLocation", (entry: FullEntry | FullLocationEntry) => {
             return this.getCodeToCopyFromLocation(entry);
         });
 
-        vscode.commands.registerCommand("weAudit.getSelectedClientCodeAndPermalink", () => {
+        registerInitializedCommand("weAudit.getSelectedClientCodeAndPermalink", () => {
             return this.getSelectedClientCodeAndPermalink();
         });
+    }
+
+    /**
+     * Ensures the active workspace root has been initialized with .vscode/info.json before user commands run.
+     */
+    ensureActiveWorkspaceInitialized(): boolean {
+        const workspaceRoot = this.getActiveWorkspaceRootPath();
+        if (workspaceRoot === undefined) {
+            vscode.window.showErrorMessage("weAudit: Open a workspace folder and run 'weAudit: Initialize Project Config' before using weAudit commands.");
+            return false;
+        }
+
+        if (!projectConfigExists(workspaceRoot)) {
+            const root = this.workspaces.getRoots().find((item) => item.rootPath === workspaceRoot);
+            const rootLabel = root?.getRootLabel() ?? workspaceRoot;
+            vscode.window.showErrorMessage(`weAudit: Project config missing for ${rootLabel}. Run 'weAudit: Initialize Project Config' first.`);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns the workspace root for the active editor, falling back to the only opened root.
+     */
+    private getActiveWorkspaceRootPath(): string | undefined {
+        const roots = this.workspaces.getRoots();
+        if (roots.length === 0) {
+            return;
+        }
+
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor !== undefined) {
+            const [activeRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(activeEditor.document.fileName);
+            if (activeRoot !== undefined) {
+                return activeRoot.rootPath;
+            }
+        }
+
+        if (roots.length === 1) {
+            return roots[0].rootPath;
+        }
+
+        return;
     }
 
     public setUsernameConfigOrDefault(): string {
@@ -2657,77 +2274,20 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
-     * Open a prefilled github issue for the given entry
-     * @param entry The entry to open an issue for
+     * Copies one or more entries as formatted markdown.
      */
-    openGithubIssue(entry: FullEntry): void {
-        // open github issue with the issue body with the finding text and permalink
-        const title = encodeURIComponent(entry.label);
-
-        const issueBodyText = this.getEntryMarkdown(entry);
-        if (issueBodyText === undefined) {
-            return;
-        }
-
-        const encodedIssueBody = encodeURIComponent(issueBodyText);
-
-        // Since each workspace root should correspond to a different git repository,
-        // we first get the corresponding root
-        let wsRoot;
-        for (const loc of entry.locations) {
-            const [_wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.rootPath);
-            if (_wsRoot !== undefined) {
-                wsRoot = _wsRoot;
-                break;
+    async copyEntriesAsMarkdown(entries: FullEntry[]): Promise<void> {
+        const markdownEntries: string[] = [];
+        for (const entry of entries) {
+            const markdown = this.getEntryMarkdown(entry);
+            if (markdown === undefined) {
+                return;
             }
+            markdownEntries.push(markdown);
         }
 
-        if (wsRoot === undefined) {
-            vscode.window.showErrorMessage(`weAudit: Error opening GitHub issue. None of the locations in this finding correspond to a workspace root.`);
-            return;
-        }
-
-        const isGitHubRemote = wsRoot.gitRemote.startsWith("https://github.com/") || wsRoot.gitRemote.startsWith("github.com/");
-
-        let issueUrl: string;
-        let issueUrlWithBody: string;
-
-        if (isGitHubRemote) {
-            issueUrl = wsRoot.gitRemote + "/issues/new?";
-            issueUrlWithBody = `${issueUrl}title=${title}&body=${encodedIssueBody}`;
-        } else {
-            // If the remote is not GitHub, we assume it is GitLab
-            // gitlab url arguments spec
-            // https://docs.gitlab.com/ee/user/project/issues/create_issues.html#using-a-url-with-prefilled-values
-            issueUrl = wsRoot.gitRemote + "/-/issues/new?";
-            issueUrlWithBody = `${issueUrl}issue[title]=${title}&issue[description]=${encodedIssueBody}`;
-        }
-
-        // GitHub's URL max size is about 8000 characters
-        // Gitlab seems to allow more but we'll use the same limit for now
-        if (issueUrlWithBody.length < 8000) {
-            // hack to get around the double encoding of openExternal.
-            // We call it with a string even though it's expecting a Uri
-            // https://github.com/microsoft/vscode/issues/85930
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            vscode.env.openExternal(issueUrlWithBody);
-            return;
-        }
-
-        // Prompt the user to copy the issue body and open the empty issue page
-        vscode.window
-            .showErrorMessage("The issue body is too long to open automatically in the URL", "Copy issue to clipboard and open browser window")
-            .then((action) => {
-                if (action === undefined) {
-                    return;
-                }
-                vscode.env.clipboard.writeText(issueBodyText);
-                const pasteHereMessage = encodeURIComponent("[Paste the issue body here]");
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                vscode.env.openExternal(`${issueUrl}title=${title}&body=${pasteHereMessage}`);
-            });
+        await vscode.env.clipboard.writeText(markdownEntries.join("\n\n---\n\n"));
+        vscode.window.showInformationMessage(`weAudit: Copied ${entries.length === 1 ? "finding" : "findings"} as Markdown.`);
     }
 
     private getEntryMarkdown(entry: FullEntry): string | void {
@@ -2742,13 +2302,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
             auditPermalinks.push(remoteAndPermalink.permalink);
 
-            // Include location section if there's a label or description
-            const locationDescription = location.description ?? "";
-            if (location.label !== "" || locationDescription !== "") {
+            // Include location section if there's a label or captured snippet.
+            const codeSnippet = location.codeSnippet ?? "";
+            if (location.label !== "" || codeSnippet !== "") {
                 locationDescriptions += `\n\n---\n`;
                 locationDescriptions += `#### Location ${i + 1} ${location.label ?? ""}\n`;
-                if (locationDescription !== "") {
-                    locationDescriptions += `${locationDescription}\n\n`;
+                if (codeSnippet !== "") {
+                    locationDescriptions += `\`\`\`\n${codeSnippet}\n\`\`\`\n\n`;
                 }
                 locationDescriptions += `${remoteAndPermalink.permalink}`;
             }
@@ -2777,258 +2337,17 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const exploit = String(entry.details.exploit ?? "");
         const recommendation = String(entry.details.recommendation ?? "");
 
-        let issueBodyText = `### Title\n${entry.label}\n\n`;
-        issueBodyText += `### Severity\n${severity}\n\n`;
-        issueBodyText += `### Difficulty\n${difficulty}\n\n`;
-        issueBodyText += `### Type\n${findingType}\n\n`;
-        issueBodyText += `### Target\n${target}\n\n`;
-        issueBodyText += `## Description\n${description}${locationDescriptions}\n\n`;
-        issueBodyText += `## Exploit Scenario\n${exploit}\n\n`;
-        issueBodyText += `## Recommendations\n${recommendation}\n\n\n`;
+        let markdownBody = `### Title\n${entry.label}\n\n`;
+        markdownBody += `### Severity\n${severity}\n\n`;
+        markdownBody += `### Difficulty\n${difficulty}\n\n`;
+        markdownBody += `### Type\n${findingType}\n\n`;
+        markdownBody += `### Target\n${target}\n\n`;
+        markdownBody += `## Description\n${description}${locationDescriptions}\n\n`;
+        markdownBody += `## Exploit Scenario\n${exploit}\n\n`;
+        markdownBody += `## Recommendations\n${recommendation}\n\n\n`;
 
-        issueBodyText += `Permalink:\n${permalinks}\n\n`;
-        return issueBodyText;
-    }
-
-    /**
-     * Generates simplified markdown for a Code Quality finding comment.
-     * Only includes title, description, location descriptions, and permalinks.
-     * @param entry The Code Quality finding entry
-     * @returns The markdown string or undefined if permalink generation fails
-     */
-    private getCQCommentMarkdown(entry: FullEntry): string | void {
-        const auditPermalinks = [];
-        let locationDescriptions = "";
-
-        for (const [i, location] of entry.locations.entries()) {
-            const remoteAndPermalink = this.getRemoteAndPermalink(location);
-            if (remoteAndPermalink === undefined) {
-                return;
-            }
-            auditPermalinks.push(remoteAndPermalink.permalink);
-
-            const locationDescription = location.description ?? "";
-            if (location.label !== "" || locationDescription !== "") {
-                locationDescriptions += `\n\n---\n`;
-                locationDescriptions += `#### Location ${i + 1} ${location.label ?? ""}\n`;
-                if (locationDescription !== "") {
-                    locationDescriptions += `${locationDescription}\n\n`;
-                }
-                locationDescriptions += `${remoteAndPermalink.permalink}`;
-            }
-        }
-
-        const permalinks = auditPermalinks.join("\n");
-
-        let bodyText = `### Title\n${entry.label}\n\n`;
-        bodyText += `## Description\n${entry.details.description ?? ""}${locationDescriptions}\n\n`;
-        bodyText += `Permalink:\n${permalinks}\n\n`;
-        return bodyText;
-    }
-
-    /**
-     * Opens a Code Quality comment flow: copies comment markdown to clipboard
-     * and opens the designated GitHub issue page. If no issue number is configured,
-     * prompts the user to enter one or create a new issue first.
-     * @param entry The Code Quality finding entry
-     */
-    async openCodeQualityComment(entry: FullEntry): Promise<void> {
-        // Find the workspace root for the entry
-        let wsRoot: WARoot | undefined;
-        for (const loc of entry.locations) {
-            const [_wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.rootPath);
-            if (_wsRoot !== undefined) {
-                wsRoot = _wsRoot;
-                break;
-            }
-        }
-
-        if (wsRoot === undefined) {
-            vscode.window.showErrorMessage("weAudit: Error opening Code Quality comment. None of the locations correspond to a workspace root.");
-            return;
-        }
-
-        // Generate the CQ comment markdown using repository facts from .vscode/info.json.
-        const commentBody = this.getCQCommentMarkdown(entry);
-        if (commentBody === undefined) {
-            return;
-        }
-
-        // Check if another workspace root with the same audit repo has a CQ issue number
-        if (wsRoot.codeQualityIssueNumber === undefined) {
-            for (const root of this.workspaces.getRoots()) {
-                if (root !== wsRoot && root.gitRemote === wsRoot.gitRemote && root.codeQualityIssueNumber !== undefined) {
-                    wsRoot.codeQualityIssueNumber = root.codeQualityIssueNumber;
-                    void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
-                    break;
-                }
-            }
-        }
-
-        // If no CQ issue number is set, prompt the user
-        if (wsRoot.codeQualityIssueNumber === undefined) {
-            const choice = await vscode.window.showQuickPick(["Enter existing issue number", "Create a new issue"], {
-                ignoreFocusOut: true,
-                title: "Code Quality Issue Setup",
-                placeHolder: "No Code Quality issue configured. How would you like to proceed?",
-            });
-
-            if (choice === undefined) {
-                return;
-            }
-
-            if (choice === "Create a new issue") {
-                // Open browser to create a new issue with a generic description
-                const title = encodeURIComponent("Code Quality");
-                const issueBody =
-                    "This issue collects Code Quality findings for this audit.\n" +
-                    "Each finding is posted as a separate comment using the following template:\n\n" +
-                    "```\n" +
-                    "### Title\n" +
-                    "{finding title}\n\n" +
-                    "## Description\n" +
-                    "{finding description}\n\n" +
-                    "Permalink:\n" +
-                    "{audit permalink(s)}\n\n" +
-                    "Client PermaLink:\n" +
-                    "{client permalink(s)}\n" +
-                    "```\n";
-                const body = encodeURIComponent(issueBody);
-                const isGitHub = wsRoot.gitRemote.startsWith("https://github.com/") || wsRoot.gitRemote.startsWith("github.com/");
-                let issueUrl: string;
-                if (isGitHub) {
-                    issueUrl = `${wsRoot.gitRemote}/issues/new?title=${title}&body=${body}`;
-                } else {
-                    issueUrl = `${wsRoot.gitRemote}/-/issues/new?issue[title]=${title}&issue[description]=${body}`;
-                }
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                vscode.env.openExternal(issueUrl);
-
-                // Prompt for the resulting issue number
-                const issueNumberStr = await vscode.window.showInputBox({
-                    prompt: "Enter the issue number that was just created",
-                    ignoreFocusOut: true,
-                    validateInput: (value) => {
-                        const num = Number(value);
-                        if (!Number.isInteger(num) || num <= 0) {
-                            return "Please enter a valid positive integer";
-                        }
-                        return undefined;
-                    },
-                });
-                if (issueNumberStr === undefined) {
-                    return;
-                }
-                wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
-                void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
-                // Fall through to the clipboard+comment flow for this first finding
-            } else {
-                // "Enter existing issue number"
-                const issueNumberStr = await vscode.window.showInputBox({
-                    prompt: "Enter the Code Quality issue number",
-                    ignoreFocusOut: true,
-                    validateInput: (value) => {
-                        const num = Number(value);
-                        if (!Number.isInteger(num) || num <= 0) {
-                            return "Please enter a valid positive integer";
-                        }
-                        return undefined;
-                    },
-                });
-                if (issueNumberStr === undefined) {
-                    return;
-                }
-                wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
-                void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
-            }
-        }
-
-        const skipConfirmation: boolean = vscode.workspace.getConfiguration("weAudit").get("general.skipCodeQualityConfirmation", false);
-
-        if (!skipConfirmation) {
-            // Prompt the user before copying and opening, consistent with the too-long-URL fallback in openGithubIssue
-            const action = await vscode.window.showInformationMessage(
-                `Code Quality comment will be copied to clipboard and issue #${wsRoot.codeQualityIssueNumber} will be opened in the browser. To skip this dialog in the future, you can change the behavior in Settings.`,
-                "Copy comment and open issue",
-                "Open Settings",
-            );
-            if (action === "Open Settings") {
-                void vscode.commands.executeCommand("workbench.action.openSettings", "weAudit.general.skipCodeQualityConfirmation");
-                return;
-            }
-            if (action === undefined) {
-                return;
-            }
-        }
-
-        await vscode.env.clipboard.writeText(commentBody);
-        const isGitHub = wsRoot.gitRemote.startsWith("https://github.com/") || wsRoot.gitRemote.startsWith("github.com/");
-        const issuePageUrl = isGitHub
-            ? `${wsRoot.gitRemote}/issues/${wsRoot.codeQualityIssueNumber}#sr-footer-heading`
-            : `${wsRoot.gitRemote}/-/issues/${wsRoot.codeQualityIssueNumber}`;
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        vscode.env.openExternal(issuePageUrl);
-    }
-
-    /**
-     * Prompts the user to set or change the Code Quality issue number for the active workspace root.
-     */
-    private async editCodeQualityIssueNumber(): Promise<void> {
-        const roots = this.workspaces.getRoots();
-        if (roots.length === 0) {
-            vscode.window.showErrorMessage("weAudit: No workspace roots available.");
-            return;
-        }
-
-        let wsRoot: WARoot;
-        if (roots.length === 1) {
-            wsRoot = roots[0];
-        } else {
-            const rootPaths = roots.map((r) => r.rootPath);
-            const selected = await vscode.window.showQuickPick(rootPaths, {
-                ignoreFocusOut: true,
-                title: "Select Workspace Root",
-                placeHolder: "Select a workspace root",
-            });
-            if (selected === undefined) {
-                return;
-            }
-            const [foundRoot] = this.workspaces.getCorrespondingRootAndPath(selected);
-            if (foundRoot === undefined) {
-                return;
-            }
-            wsRoot = foundRoot;
-        }
-
-        const currentValue = wsRoot.codeQualityIssueNumber;
-        const issueNumberStr = await vscode.window.showInputBox({
-            prompt: "Enter the Code Quality GitHub issue number",
-            value: currentValue !== undefined ? String(currentValue) : "",
-            validateInput: (value) => {
-                if (value === "") {
-                    return undefined; // allow clearing
-                }
-                const num = Number(value);
-                if (!Number.isInteger(num) || num <= 0) {
-                    return "Please enter a valid positive integer or leave empty to clear";
-                }
-                return undefined;
-            },
-        });
-        if (issueNumberStr === undefined) {
-            return;
-        }
-
-        wsRoot.codeQualityIssueNumber = issueNumberStr === "" ? undefined : Number(issueNumberStr);
-        void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
-
-        if (wsRoot.codeQualityIssueNumber !== undefined) {
-            vscode.window.showInformationMessage(`Code Quality issue number set to #${wsRoot.codeQualityIssueNumber}.`);
-        } else {
-            vscode.window.showInformationMessage("Code Quality issue number cleared.");
-        }
+        markdownBody += `Permalink:\n${permalinks}\n\n`;
+        return markdownBody;
     }
 
     /**
@@ -3505,7 +2824,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     startLine: loc.startLine,
                                     endLine: loc.endLine,
                                     label: loc.label,
-                                    description: loc.description,
+                                    codeSnippet: loc.codeSnippet,
                                     rootPath: rootPath,
                                 }) as FullLocation,
                         ),
@@ -3527,7 +2846,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     startLine: loc.startLine,
                                     endLine: loc.endLine,
                                     label: loc.label,
-                                    description: loc.description,
+                                    codeSnippet: loc.codeSnippet,
                                     rootPath: rootPath,
                                 }) as FullLocation,
                         ),
@@ -4582,16 +3901,15 @@ export class AuditMarker {
             this.showEntryInFindingDetails(entry);
         });
 
-        vscode.commands.registerCommand("weAudit.openGithubIssueFromDetails", () => {
+        vscode.commands.registerCommand("weAudit.copyFindingAsMarkdownFromDetails", () => {
+            if (!treeDataProvider.ensureActiveWorkspaceInitialized()) {
+                return;
+            }
             const entry = this.getCurrentlySelectedFullEntry();
             if (entry === undefined) {
                 return;
             }
-            if (entry.details.severity === FindingSeverity.CodeQuality) {
-                void treeDataProvider.openCodeQualityComment(entry);
-            } else {
-                void treeDataProvider.openGithubIssue(entry);
-            }
+            void treeDataProvider.copyEntriesAsMarkdown([entry]);
         });
 
         // Activate the finding boundary CodeLens feature

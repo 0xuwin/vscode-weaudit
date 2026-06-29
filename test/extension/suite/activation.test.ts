@@ -50,7 +50,7 @@ suite("Extension Activation", () => {
             "weAudit.copyEntryPermalink",
             "weAudit.copySelectedCodePermalink",
             "weAudit.toggleTreeViewMode",
-            "weAudit.openGithubIssue",
+            "weAudit.copyFindingAsMarkdown",
             "weAudit.exportFindingsInMarkdown",
             "weAudit.showMarkedFilesDayLog",
             "weAudit.navigateToNextPartiallyAuditedRegion",
@@ -63,14 +63,6 @@ suite("Extension Activation", () => {
             "weAudit.boundaryExpandDown",
             "weAudit.boundaryShrinkBottom",
             "weAudit.boundaryMoveDown",
-            // Git config commands
-            "weAudit.editClientRemote",
-            "weAudit.editAuditRemote",
-            // Code Quality commands
-            "weAudit.editCodeQualityIssueNumber",
-            // Multi-root workspace commands
-            "weAudit.nextGitConfig",
-            "weAudit.prevGitConfig",
         ];
 
         for (const cmd of expectedCommands) {

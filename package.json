@@ -58,13 +58,6 @@
                     "contextualTitle": "weAudit"
                 },
                 {
-                    "type": "webview",
-                    "id": "gitConfig",
-                    "name": "Repository Configuration",
-                    "visibility": "collapsed",
-                    "contextualTitle": "weAudit"
-                },
-                {
                     "id": "savedFindings",
                     "name": "weAudit Files",
                     "contextualTitle": "weAudit"
@@ -73,14 +66,14 @@
         },
         "commands": [
             {
-                "command": "weAudit.openGithubIssue",
-                "title": "Open Remote Issue",
-                "icon": "$(github)"
+                "command": "weAudit.copyFindingAsMarkdown",
+                "title": "Copy as Markdown",
+                "icon": "$(markdown)"
             },
             {
-                "command": "weAudit.openGithubIssueFromDetails",
-                "title": "Open Remote Issue",
-                "icon": "$(github)"
+                "command": "weAudit.copyFindingAsMarkdownFromDetails",
+                "title": "Copy as Markdown",
+                "icon": "$(markdown)"
             },
             {
                 "command": "weAudit.copyEntryPermalink",
@@ -99,38 +92,6 @@
             {
                 "command": "weAudit.copySelectedCodeClientPermalink",
                 "title": "weAudit: Copy Permalink (Client Repository)"
-            },
-            {
-                "command": "weAudit.editClientRemote",
-                "title": "weAudit: Edit Repository URL (Client)"
-            },
-            {
-                "command": "weAudit.editAuditRemote",
-                "title": "weAudit: Edit Repository URL (Audit)"
-            },
-            {
-                "command": "weAudit.editGitHash",
-                "title": "weAudit: Edit Git Commit Hash"
-            },
-            {
-                "command": "weAudit.setupRepositoriesCurrent",
-                "title": "weAudit: Setup git configurations for this workspace root",
-                "icon": "$(github)"
-            },
-            {
-                "command": "weAudit.setupRepositoriesAll",
-                "title": "weAudit: Setup git configurations for all workspace roots",
-                "icon": "$(github-inverted)"
-            },
-            {
-                "command": "weAudit.nextGitConfig",
-                "title": "weAudit: Show next workspace root",
-                "icon": "$(arrow-right)"
-            },
-            {
-                "command": "weAudit.prevGitConfig",
-                "title": "weAudit: Show previous workspace root",
-                "icon": "$(arrow-left)"
             },
             {
                 "command": "weAudit.resolveFinding",
@@ -274,10 +235,6 @@
                 "title": "weAudit: Move Finding Down"
             },
             {
-                "command": "weAudit.editCodeQualityIssueNumber",
-                "title": "weAudit: Set Code Quality Issue Number"
-            },
-            {
                 "command": "weAudit.initializeProjectConfig",
                 "title": "weAudit: Initialize Project Config"
             },
@@ -396,7 +353,7 @@
                     "when": "false"
                 },
                 {
-                    "command": "weAudit.openGithubIssue",
+                    "command": "weAudit.copyFindingAsMarkdown",
                     "when": "false"
                 },
                 {
@@ -484,27 +441,7 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "weAudit.setupRepositoriesCurrent",
-                    "when": "view == gitConfig",
-                    "group": "navigation@2"
-                },
-                {
-                    "command": "weAudit.setupRepositoriesAll",
-                    "when": "view == gitConfig && workspaceFolderCount > 1",
-                    "group": "navigation@3"
-                },
-                {
-                    "command": "weAudit.nextGitConfig",
-                    "when": "view == gitConfig",
-                    "group": "navigation@1"
-                },
-                {
-                    "command": "weAudit.prevGitConfig",
-                    "when": "view == gitConfig",
-                    "group": "navigation@0"
-                },
-                {
-                    "command": "weAudit.openGithubIssueFromDetails",
+                    "command": "weAudit.copyFindingAsMarkdownFromDetails",
                     "when": "view == findingDetails && weAudit.findingDetailsHasEntry",
                     "group": "navigation"
                 }
@@ -526,7 +463,7 @@
                     "group": "inline@2"
                 },
                 {
-                    "command": "weAudit.openGithubIssue",
+                    "command": "weAudit.copyFindingAsMarkdown",
                     "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
                     "group": "inline@4"
                 },
@@ -594,11 +531,6 @@
                         ],
                         "description": "The List of Findings display mode."
                     },
-                    "weAudit.general.githubOrganizationName": {
-                        "type": "string",
-                        "default": "trailofbits",
-                        "description": "Defining the organization name for the audit repository enhances the heuristic to determine the correct git remote when creating permalinks."
-                    },
                     "weAudit.general.username": {
                         "type": "string",
                         "default": "",
@@ -613,11 +545,6 @@
                         "type": "boolean",
                         "default": false,
                         "description": "Sort findings and notes alphabetically by name in the tree view."
-                    },
-                    "weAudit.general.skipCodeQualityConfirmation": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Skip the confirmation dialog when opening a Code Quality comment. The comment will be copied to clipboard and the issue opened immediately."
                     },
                     "weAudit.findingSchema.fields": {
                         "type": "array",

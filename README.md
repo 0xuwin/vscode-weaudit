@@ -13,7 +13,7 @@
 
 WeAudit is an essential extension in the arsenal of any code auditor.
 
-With weAudit, you can bookmark regions of code to highlight issues, add notes, mark files as reviewed, and collaborate with your fellow auditors. Enhance your reporting workflow by writing the findings directly in VSCode, creating prefilled GitHub issues, and copying links. For the stats lovers, analyze your audit progress with the daily log, showing the number of files and LOC audited per day.
+With weAudit, you can bookmark regions of code to highlight issues, add notes, mark files as reviewed, and collaborate with your fellow auditors. Enhance your reporting workflow by writing findings directly in VS Code, copying formatted Markdown, and copying links. For the stats lovers, analyze your audit progress with the daily log, showing the number of files and LOC audited per day.
 
 ![Screenshot](media/readme/screenshot.png)
 
@@ -31,10 +31,10 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Audited Files**](#audited-files) - Mark an entire file as reviewed.
 -   [**Partially Audited Files**](#partially-audited-files) - Mark a region of code as reviewed.
 -   [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
--   [**GitHub/Gitlab Issues**](#githubgitlab-issues) - Create formatted GitHub or Gitlab issues with the Detailed Findings information.
+-   [**Copy as Markdown**](#copy-as-markdown) - Copy formatted finding details as Markdown.
 -   [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
 -   [**Resolve and Restore**](#resolve-and-restore) - Resolved findings will not be highlighted in the editor but are still visible in the sidebar.
--   [**Copy Permalinks**](#copy-permalinks) - Copy GitHub permalinks to findings, or to a selected code region.
+-   [**Copy Permalinks**](#copy-permalinks) - Copy source permalinks to findings, or to a selected code region.
 -   [**Daily Log**](#daily-log) - View a daily log of all the marked files and LOC per day.
 -   [**View Mode**](#view-mode) - View findings in a list, or grouped by filename.
 -   [**Multiple Users**](#multiple-users) - Findings can be viewed from multiple different users.
@@ -93,11 +93,11 @@ You can fill detailed information about a finding by clicking on it in the _List
 
 ![Finding Details](media/readme/finding_details.png)
 
-### GitHub/Gitlab Issues
+### Copy as Markdown
 
-You can create a GitHub/Gitlab issue with the detailed findings information by clicking on the corresponding `Open Remote Issue` button in the _List of Findings_ panel or the same button in the _Finding Details_ view. A browser window will open prompting you to open the issue with the prefilled information from the _Finding Details_ panel.
+You can copy a finding's detailed information as Markdown by clicking the `Copy as Markdown` button in the _List of Findings_ panel or the same button in the _Finding Details_ view. The copied Markdown includes the finding details and configured permalinks.
 
-![Open Remote Issue](media/readme/gifs/create_gh_issue.gif)
+![Copy as Markdown](media/readme/gifs/create_gh_issue.gif)
 
 ### Multi-region Findings
 
@@ -119,7 +119,7 @@ You can resolve a finding by clicking on the corresponding `Resolve` button in t
 
 ### Copy Permalinks
 
-Copy the Audit permalink by clicking on the corresponding `Copy Audit Permalink` button in the _List of Findings_ panel.
+Copy the configured source permalink by clicking on the corresponding `Copy Audit Permalink` button in the _List of Findings_ panel.
 
 ![Copy Audit Permalink](media/readme/copy_permalink.png)
 
@@ -194,7 +194,6 @@ You can drag and drop findings and locations in the _List of Findings_ panel to:
 #### General settings
 
 -   `weAudit.general.treeViewMode`: The List of Findings display mode ("list" or "byFile")
--   `weAudit.general.githubOrganizationName`: Organization name for audit repository (enhances permalink heuristic)
 -   `weAudit.general.username`: Username to use as finding's author (defaults to system username if empty)
 -   `weAudit.general.permalinkSeparator`: Separator to use in permalinks (\\n is interpreted as newline)
 
@@ -232,9 +231,7 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 
 -   **Findings and Notes**: A region of code that is of interest. Findings can be marked as "Resolved" or "Restored". There is no actual difference between findings and notes, except that they can be assigned different colors and that findings are displayed before notes in the _List of Findings_ panel.
 -   **Audited Files**: A file that has been reviewed. This is a binary state, either a file is audited or it is not.
--   **Audit and Client Repositories**:
-    -   **Audit Repository**: The repository where issues should be created. This is usually the Trail of Bits repository with the code being audited.
-    -   **Client Repository**: The repository that the Audit Repository mirrors. This is used to create permalinks to include in the report.
+-   **Project Repositories**: Repositories are declared in `.vscode/info.json`, including their workspace-relative roots, remotes, and named versions/commits. weAudit uses this project config to resolve source permalinks and reporting metadata.
 
 
 ## Development

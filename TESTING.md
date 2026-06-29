@@ -120,10 +120,6 @@ Implemented under `test/extension/suite/`:
 **Not yet added (UI candidates)**
 
 From `package.json` and `src/codeMarker.ts`, the remaining UI-heavy commands worth adding coverage for:
-- QuickPick / QuickInput flows:
-  - `weAudit: Edit Repository URL (Client)` (`weAudit.editClientRemote`) – input box
-  - `weAudit: Edit Repository URL (Audit)` (`weAudit.editAuditRemote`) – input box
-  - `weAudit: Edit Git Commit Hash` (`weAudit.editGitHash`) – input box
 - Tree view / command palette UX:
   - `weAudit: Search and Filter Findings` (`weAudit.showFindingsSearchBar`) – triggers `list.find` on the tree view
 - Context menu & multi-step flows (require tree view interaction, not command palette):
@@ -137,8 +133,8 @@ From `package.json` and `src/codeMarker.ts`, the remaining UI-heavy commands wor
 **Not yet added (other command candidates)**
 
 These are typically better suited to extension-host tests (stubbing VS Code APIs) or webview tests:
-- Clipboard/external actions:
-  - `weAudit.openGithubIssue`, `weAudit.openGithubIssueFromDetails` (stub `vscode.env.openExternal`)
+- Clipboard actions:
+  - `weAudit.copyFindingAsMarkdown`, `weAudit.copyFindingAsMarkdownFromDetails` copy finding details as Markdown (stub `vscode.env.clipboard`)
   - `weAudit.copyEntryPermalink`, `weAudit.copyEntryPermalinks`, `weAudit.copySelectedCodePermalink`, `weAudit.copySelectedCodeClientPermalink` (stub `vscode.env.clipboard`)
 - Navigation and toggles:
   - `weAudit.navigateToNextPartiallyAuditedRegion` (assert cursor position changes)
@@ -146,7 +142,7 @@ These are typically better suited to extension-host tests (stubbing VS Code APIs
 - Resolved findings lifecycle:
   - `weAudit.resolveFinding`, `weAudit.restoreFinding`, `weAudit.deleteResolvedFinding`, `weAudit.deleteAllResolvedFinding`, `weAudit.restoreAllResolvedFindings`
 - Webview wiring (from `src/codeMarker.ts` command registrations not exposed as palette commands):
-  - `weAudit.updateCurrentSelectedEntry`, `weAudit.updateGitConfig`, `weAudit.showSelectedEntryInFindingDetails`
+  - `weAudit.updateCurrentSelectedEntry`, `weAudit.showSelectedEntryInFindingDetails`
 
 **How we use ExTester successfully**
 
@@ -420,15 +416,13 @@ Native dialogs (file open, context menus, title bar menus) are **not automatable
 
 | Test | Type | Description |
 |------|------|-------------|
-| `getRemoteAndPermalink` generates GitHub URL | + | github.com format |
-| `getRemoteAndPermalink` generates GitLab URL | + | gitlab.com format |
+| `getRemoteAndPermalink` generates blob-style forge URL | + | `/blob/<commit>` format |
+| `getRemoteAndPermalink` generates GitLab URL | + | GitLab blob-style format |
 | `getRemoteAndPermalink` generates Bitbucket URL | + | bitbucket.org format |
 | `getRemoteAndPermalink` handles single line | + | `#L10` format |
 | `getRemoteAndPermalink` handles line range | + | `#L10-L20` format |
-| `getRemoteAndPermalink` strips `.git` suffix | + | Clean URL |
-| `getRemoteAndPermalink` handles SSH remote | + | Converts to HTTPS |
-| `getRemoteAndPermalink` returns empty for missing remote | - | Empty string |
-| `getClientPermalink` uses client remote | + | Different from audit remote |
+| `getRemoteAndPermalink` reads project config remote | + | Uses `.vscode/info.json` |
+| `getRemoteAndPermalink` returns empty for missing remote | - | Missing project config remote |
 | `copyEntryPermalinks` uses configured separator | + | Newline or custom |
 | `copyEntryPermalinks` includes all locations | + | Multi-location entry |
 
@@ -598,8 +592,7 @@ test/extension/
 | `weAudit.resolveFinding` moves to resolved tree | + | Entry in resolved view |
 | `weAudit.restoreFinding` moves back to active | + | Entry in main view |
 | `weAudit.copyPermalink` copies to clipboard | + | Clipboard contains URL |
-| `weAudit.copyClientPermalink` uses client remote | + | Different URL than audit |
-| `weAudit.openGitHubIssue` opens external URL | + | URL contains finding data |
+| `weAudit.copyFindingAsMarkdown` copies markdown | + | Clipboard contains finding details |
 | `weAudit.exportFindings` creates markdown file | + | Valid markdown output |
 | `weAudit.showDayLog` displays log in output | + | Output channel shown |
 | `weAudit.navigateToNextPartiallyAuditedRegion` moves cursor | + | Selection changes |

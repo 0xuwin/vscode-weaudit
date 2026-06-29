@@ -6,6 +6,7 @@ import * as vscode from "vscode";
 import { PROJECT_CONFIG_SCHEMA_VERSION, ProjectConfig, ProjectConfigValidationResult } from "./types";
 import { getProjectConfigPath, projectConfigExists, readProjectConfig, writeProjectConfig } from "./storage";
 import { isValidProjectConfig, validateProjectConfig } from "./validation";
+import { normalizeGitRemote } from "./gitRemote";
 
 /**
  * Registers project config commands on extension activation.
@@ -153,23 +154,6 @@ function readGitRemote(workspaceRoot: string): string | undefined {
     const originRemote = gitConfig.match(/\[remote "origin"\][\s\S]*?url = (.*)/);
     const fallbackRemote = gitConfig.match(/url = (.*)/);
     return normalizeGitRemote((originRemote ?? fallbackRemote)?.[1]?.trim());
-}
-
-/**
- * Normalizes common Git remote URL forms for project config storage.
- */
-function normalizeGitRemote(remote: string | undefined): string | undefined {
-    if (remote === undefined) {
-        return;
-    }
-    let normalized = remote;
-    if (normalized.startsWith("git@github.com:")) {
-        normalized = normalized.replace("git@github.com:", "https://github.com/");
-    }
-    if (normalized.endsWith(".git")) {
-        normalized = normalized.slice(0, -".git".length);
-    }
-    return normalized;
 }
 
 /**

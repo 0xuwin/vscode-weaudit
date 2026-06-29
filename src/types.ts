@@ -187,7 +187,13 @@ function validatepartiallyAuditedFile(partiallyAuditedFile: PartiallyAuditedFile
 }
 
 function validateLocation(location: Location): boolean {
-    return location.path !== undefined && location.startLine !== undefined && location.endLine !== undefined && location.label !== undefined;
+    return (
+        location.path !== undefined &&
+        location.startLine !== undefined &&
+        location.endLine !== undefined &&
+        location.label !== undefined &&
+        location.codeSnippet !== undefined
+    );
 }
 
 // ====================================================================
@@ -240,8 +246,8 @@ export interface Location {
     /** The label of the location */
     label: string;
 
-    /** Optional human-readable description for this specific location. */
-    description?: string;
+    /** Source code snippet captured for this location. */
+    codeSnippet: string;
 
     /** Optional commit associated with this location. */
     commit?: string;

@@ -68,7 +68,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 title: title,
             });
 
-            // Set context to show the "Open Remote Issue" button in the view title
+            // Set context to show the "Copy as Markdown" button in the view title
             // https://code.visualstudio.com/api/references/when-clause-contexts#add-a-custom-when-clause-context
             vscode.commands.executeCommand("setContext", "weAudit.findingDetailsHasEntry", true);
         }
@@ -83,7 +83,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 command: "hide-finding-details",
             });
 
-            // Set context to show the "Open Remote Issue" button in the view title
+            // Set context to show the "Copy as Markdown" button in the view title
             // https://code.visualstudio.com/api/references/when-clause-contexts#add-a-custom-when-clause-context
             vscode.commands.executeCommand("setContext", "weAudit.findingDetailsHasEntry", false);
         }

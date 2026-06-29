@@ -34,7 +34,7 @@ function createValidEntry() {
                 startLine: 10,
                 endLine: 20,
                 label: "test location",
-                description: "",
+                codeSnippet: "",
             },
         ],
     };
@@ -101,7 +101,7 @@ describe("validateSerializedData", () => {
                 startLine: 5,
                 endLine: 10,
                 label: "second location",
-                description: "with description",
+                codeSnippet: "with snippet",
             });
             data.treeEntries = [entry];
             expect(validateSerializedData(data)).to.equal(true);
@@ -300,6 +300,14 @@ describe("validateSerializedData", () => {
             data.treeEntries = [entry];
             expect(validateSerializedData(data)).to.equal(false);
         });
+
+        it("rejects location missing codeSnippet", () => {
+            const data = createDefaultSerializedData();
+            const entry: any = createValidEntry();
+            delete entry.locations[0].codeSnippet;
+            data.treeEntries = [entry];
+            expect(validateSerializedData(data)).to.equal(false);
+        });
     });
 
     describe("invalid auditedFile fields", () => {
@@ -416,14 +424,14 @@ describe("validateSerializedData", () => {
         it("accepts extra non-schema top-level fields", () => {
             const data: any = {
                 ...createValidSerializedData(),
-                codeQualityIssueNumber: 42,
+                externalField: 42,
             };
             expect(validateSerializedData(data)).to.equal(true);
         });
 
-        it("does not include codeQualityIssueNumber in new serialized data", () => {
+        it("does not include project-level fields in new serialized data", () => {
             const data = createValidSerializedData();
-            expect((data as any).codeQualityIssueNumber).to.be.undefined;
+            expect((data as any).externalField).to.be.undefined;
             expect(validateSerializedData(data)).to.equal(true);
         });
 

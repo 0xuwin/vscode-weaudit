@@ -5,26 +5,18 @@ import * as vscode from "vscode";
 import { AuditMarker } from "./codeMarker";
 import { MultipleSavedFindings } from "./multiConfigs";
 import { activateFindingDetailsWebview } from "./panels/findingDetailsPanel";
-import { activateGitConfigWebview } from "./panels/gitConfigPanel";
 import { activateProjectConfigCommands } from "./projectConfig/commands";
 
 export function activate(context: vscode.ExtensionContext): void {
-    // if there are no open folders, return
-    // the extension will be reactivated when a folder is opened
-    if (vscode.workspace.workspaceFolders === undefined) {
-        return;
-    }
-
     vscode.commands.registerCommand("weAudit.openFileLines", (resource: vscode.Uri, startLine: number, endLine: number) =>
         openResource(resource, startLine, endLine),
     );
     vscode.commands.registerCommand("weAudit.openFile", (resource: vscode.TextDocument) => vscode.window.showTextDocument(resource));
 
-    new AuditMarker(context);
     new MultipleSavedFindings(context);
     activateFindingDetailsWebview(context);
-    activateGitConfigWebview(context);
     activateProjectConfigCommands(context);
+    new AuditMarker(context);
 }
 
 async function openResource(resource: vscode.Uri, startLine: number, endLine: number): Promise<void> {

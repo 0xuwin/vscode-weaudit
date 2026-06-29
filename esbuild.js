@@ -27,14 +27,6 @@ const webviewConfig = {
     outfile: "./out/findingDetailsWebview.js",
 };
 
-const gitConfigWebviewConfig = {
-    ...baseConfig,
-    target: "es2020",
-    format: "esm",
-    entryPoints: ["./src/webview/gitConfigMain.ts"],
-    outfile: "./out/gitConfigWebview.js",
-};
-
 const watchPlugin = {
     name: "watch-plugin",
     setup(build) {
@@ -63,19 +55,12 @@ const watchPlugin = {
                 ...webviewConfig,
                 plugins: [watchPlugin],
             });
-            const gitConfigWebviewContext = await context({
-                ...gitConfigWebviewConfig,
-                plugins: [watchPlugin],
-            });
-
             await extensionContext.watch();
             await webviewContext.watch();
-            await gitConfigWebviewContext.watch();
         } else {
             // Build extension and webview code
             await build(extensionConfig);
             await build(webviewConfig);
-            await build(gitConfigWebviewConfig);
             console.log("build complete");
         }
     } catch (err) {

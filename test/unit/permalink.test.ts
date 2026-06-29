@@ -15,13 +15,13 @@ describe("Permalink Generation Logic", () => {
      */
     const generatePermalink = generateSourcePermalink;
 
-    describe("GitHub permalink generation", () => {
-        const gitRemote = "https://github.com/trailofbits/vscode-weaudit";
+    describe("blob-style forge permalink generation", () => {
+        const gitRemote = "https://example.com/trailofbits/vscode-weaudit";
         const sha = "abc123def456";
 
-        it("should generate correct GitHub permalink", () => {
+        it("should generate correct blob-style permalink", () => {
             const permalink = generatePermalink(gitRemote, sha, "src/codeMarker.ts", 10, 20);
-            assert.strictEqual(permalink, "https://github.com/trailofbits/vscode-weaudit/blob/abc123def456/src/codeMarker.ts#L11-L21");
+            assert.strictEqual(permalink, "https://example.com/trailofbits/vscode-weaudit/blob/abc123def456/src/codeMarker.ts#L11-L21");
         });
 
         it("should convert 0-indexed lines to 1-indexed", () => {
@@ -63,7 +63,7 @@ describe("Permalink Generation Logic", () => {
     });
 
     describe("path encoding in permalinks", () => {
-        const gitRemote = "https://github.com/org/repo";
+        const gitRemote = "https://example.com/org/repo";
         const sha = "abc123";
 
         // NOTE: Currently the code does NOT URL-encode paths - this is a potential bug
@@ -88,8 +88,8 @@ describe("Permalink Generation Logic", () => {
         });
 
         it("should handle paths starting with special characters", () => {
-            const permalink = generatePermalink(gitRemote, sha, ".github/workflows/ci.yml", 1, 5);
-            assert.ok(permalink.includes(".github/workflows/ci.yml"));
+            const permalink = generatePermalink(gitRemote, sha, ".ci/workflows/ci.yml", 1, 5);
+            assert.ok(permalink.includes(".ci/workflows/ci.yml"));
         });
     });
 
@@ -98,36 +98,35 @@ describe("Permalink Generation Logic", () => {
 
         it("should handle remote URL with trailing slash", () => {
             // If the remote URL has a trailing slash, we'd get double slashes
-            const gitRemote = "https://github.com/org/repo/";
+            const gitRemote = "https://example.com/org/repo/";
             const permalink = generatePermalink(gitRemote, sha, "file.ts", 1, 2);
             // Note: Current implementation would produce //blob/
             assert.ok(permalink.includes("repo//blob/") || permalink.includes("repo/blob/"));
         });
 
-        it("should handle GitLab URLs (uses GitHub-style format)", () => {
+        it("should handle GitLab URLs (uses blob-style format)", () => {
             const gitRemote = "https://gitlab.com/group/project";
             const permalink = generatePermalink(gitRemote, sha, "file.ts", 1, 2);
-            // GitLab URLs get treated like GitHub
             assert.ok(permalink.includes("/blob/"));
             assert.ok(permalink.includes("#L2-L3"));
         });
 
-        it("should handle self-hosted GitHub Enterprise URLs", () => {
-            const gitRemote = "https://github.company.com/org/repo";
+        it("should handle self-hosted blob-style forge URLs", () => {
+            const gitRemote = "https://git.company.com/org/repo";
             const permalink = generatePermalink(gitRemote, sha, "file.ts", 1, 2);
             assert.ok(permalink.includes("/blob/"));
         });
 
         it("should handle invalid URL gracefully", () => {
             const gitRemote = "not-a-valid-url";
-            // Should not throw, will use default GitHub format
+            // Should not throw, will use default blob-style format
             const permalink = generatePermalink(gitRemote, sha, "file.ts", 1, 2);
             assert.ok(permalink.includes("/blob/"));
         });
     });
 
     describe("SHA handling", () => {
-        const gitRemote = "https://github.com/org/repo";
+        const gitRemote = "https://example.com/org/repo";
 
         it("should include full SHA in permalink", () => {
             const fullSha = "abc123def456789012345678901234567890abcd";
@@ -143,7 +142,7 @@ describe("Permalink Generation Logic", () => {
     });
 
     describe("line number edge cases", () => {
-        const gitRemote = "https://github.com/org/repo";
+        const gitRemote = "https://example.com/org/repo";
         const sha = "abc123";
 
         it("should handle very large line numbers", () => {

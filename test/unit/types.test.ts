@@ -90,7 +90,7 @@ describe("types.ts", () => {
                         startLine: 1,
                         endLine: 10,
                         label: "Location 1",
-                        description: "",
+                        codeSnippet: "",
                     },
                 ],
             };
@@ -215,7 +215,7 @@ describe("types.ts", () => {
                         startLine: 1,
                         endLine: 10,
                         label: "Location 1",
-                        description: "",
+                        codeSnippet: "",
                     },
                 ],
                 ...overrides,
@@ -250,8 +250,8 @@ describe("types.ts", () => {
             const a = createEntry();
             const b = createEntry({
                 locations: [
-                    { path: "src/test.ts", startLine: 1, endLine: 10, label: "Location 1", description: "" },
-                    { path: "src/test2.ts", startLine: 1, endLine: 5, label: "Location 2", description: "" },
+                    { path: "src/test.ts", startLine: 1, endLine: 10, label: "Location 1", codeSnippet: "" },
+                    { path: "src/test2.ts", startLine: 1, endLine: 5, label: "Location 2", codeSnippet: "" },
                 ],
             });
             assert.strictEqual(entryEquals(a, b), false);
@@ -259,40 +259,40 @@ describe("types.ts", () => {
 
         it("should return false for different location paths", () => {
             const a = createEntry({
-                locations: [{ path: "src/a.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [{ path: "src/a.ts", startLine: 1, endLine: 10, label: "L", codeSnippet: "" }],
             });
             const b = createEntry({
-                locations: [{ path: "src/b.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [{ path: "src/b.ts", startLine: 1, endLine: 10, label: "L", codeSnippet: "" }],
             });
             assert.strictEqual(entryEquals(a, b), false);
         });
 
         it("should return false for different location startLines", () => {
             const a = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "L", codeSnippet: "" }],
             });
             const b = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 5, endLine: 10, label: "L", description: "" }],
+                locations: [{ path: "src/test.ts", startLine: 5, endLine: 10, label: "L", codeSnippet: "" }],
             });
             assert.strictEqual(entryEquals(a, b), false);
         });
 
         it("should return false for different location endLines", () => {
             const a = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "L", codeSnippet: "" }],
             });
             const b = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 20, label: "L", description: "" }],
+                locations: [{ path: "src/test.ts", startLine: 1, endLine: 20, label: "L", codeSnippet: "" }],
             });
             assert.strictEqual(entryEquals(a, b), false);
         });
 
         it("should ignore differences in location labels", () => {
             const a = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "Label A", description: "" }],
+                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "Label A", codeSnippet: "" }],
             });
             const b = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "Label B", description: "" }],
+                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "Label B", codeSnippet: "" }],
             });
             assert.strictEqual(entryEquals(a, b), true);
         });
@@ -321,7 +321,7 @@ describe("types.ts", () => {
                 entryType: EntryType.Finding,
                 author: "testuser",
                 details: createDefaultEntryDetails(),
-                locations: [{ path, startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [{ path, startLine: 1, endLine: 10, label: "L", codeSnippet: "" }],
             };
         }
 
@@ -464,7 +464,7 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", codeSnippet: "", rootPath: "/root" }],
                 };
                 assert.strictEqual(isEntry(entry), true);
             });
@@ -480,10 +480,10 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", codeSnippet: "", rootPath: "/root" }],
                 };
                 const entry: FullLocationEntry = {
-                    location: { path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" },
+                    location: { path: "test.ts", startLine: 1, endLine: 5, label: "L", codeSnippet: "", rootPath: "/root" },
                     parentEntry,
                 };
                 assert.strictEqual(isEntry(entry), false);
@@ -497,10 +497,10 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", codeSnippet: "", rootPath: "/root" }],
                 };
                 const entry: FullLocationEntry = {
-                    location: { path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" },
+                    location: { path: "test.ts", startLine: 1, endLine: 5, label: "L", codeSnippet: "", rootPath: "/root" },
                     parentEntry,
                 };
                 assert.strictEqual(isLocationEntry(entry), true);
@@ -512,7 +512,7 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", codeSnippet: "", rootPath: "/root" }],
                 };
                 assert.strictEqual(isLocationEntry(entry), false);
             });
@@ -530,7 +530,7 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", codeSnippet: "", rootPath: "/root" }],
                 };
                 assert.strictEqual(isPathOrganizerEntry(entry), false);
             });
@@ -668,7 +668,7 @@ describe("types.ts", () => {
                         startLine: 1,
                         endLine: 10,
                         label: "Location 1",
-                        description: "",
+                        codeSnippet: "",
                     },
                 ],
             };
@@ -676,7 +676,7 @@ describe("types.ts", () => {
 
         it("should validate serialized data without project-level fields", () => {
             const data: SerializedData = createDefaultSerializedData();
-            assert.strictEqual((data as unknown as { codeQualityIssueNumber?: number }).codeQualityIssueNumber, undefined);
+            assert.deepStrictEqual(Object.keys(data).sort(), ["auditedFiles", "partiallyAuditedFiles", "resolvedEntries", "schemaVersion", "treeEntries"]);
             assert.strictEqual(validateSerializedData(data), true);
         });
 

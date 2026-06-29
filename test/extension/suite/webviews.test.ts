@@ -22,7 +22,7 @@ suite("Webview Panels", () => {
 
         // Verify all expected webview panels are registered
         const viewIds = views.map((v: { id: string }) => v.id);
-        const expectedViews = ["findingDetails", "gitConfig"];
+        const expectedViews = ["findingDetails"];
 
         for (const viewId of expectedViews) {
             assert.ok(viewIds.includes(viewId), `${viewId} panel should be registered`);
@@ -32,7 +32,7 @@ suite("Webview Panels", () => {
     test("Webview panels can be focused and their commands remain registered", async function () {
         this.timeout(10000);
 
-        const panels = ["findingDetails", "gitConfig"];
+        const panels = ["findingDetails"];
 
         for (const panel of panels) {
             // Focus the panel

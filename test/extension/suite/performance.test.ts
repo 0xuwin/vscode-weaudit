@@ -70,7 +70,7 @@ suite("Performance", () => {
                         startLine: i % 40,
                         endLine: (i % 40) + 1,
                         label: "",
-                        description: "",
+                        code_snippet: "",
                     },
                 ],
             });
@@ -166,7 +166,7 @@ suite("Performance", () => {
                         startLine: i % 40,
                         endLine: (i % 40) + 1,
                         label: `Location ${i}`,
-                        description: "",
+                        code_snippet: "",
                     },
                 ],
             });
