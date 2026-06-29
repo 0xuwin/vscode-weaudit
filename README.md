@@ -197,6 +197,11 @@ You can drag and drop findings and locations in the _List of Findings_ panel to:
 -   `weAudit.general.username`: Username to use as finding's author (defaults to system username if empty)
 -   `weAudit.general.permalinkSeparator`: Separator to use in permalinks (\\n is interpreted as newline)
 
+#### Finding Schema settings
+
+-   `weAudit.findingSchema.fields`: Additional finding detail fields rendered after title and description. Supports `text`, `textarea`, `select`, `checkbox`, and `number` types with optional `visibleWhen` conditional visibility rules.
+-   `weAudit.findingSchema.labelTemplate`: Template for rendering finding labels in the tree view (e.g. `[${severity}] ${title}`). Notes are not affected.
+
 #### Background colors
 
 Each background color is customizable via the VSCode settings page. Write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA:
@@ -214,8 +219,6 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 -   `weAudit.deleteLocationUnderCursor`: Delete Finding Under Cursor: `cmd + 5`
 -   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
 -   `weAudit.addPartiallyAudited`: Mark Region As Reviewed: `cmd + shift + 7`
--   `weAudit.copySelectedCodePermalink`: Copy Permalink (for the Selected Code Region): `cmd + 8`
--   `weAudit.copySelectedCodeClientPermalink`: Copy Client Permalink (for the Selected Code Region): `cmd + 9`
 -   `weAudit.navigateToNextPartiallyAuditedRegion`: Navigate to Next Partially Audited Region: `cmd + 0`
 -   `weAudit.boundaryExpandUp`: Expand Finding Up: `cmd + shift + numpad7`
 -   `weAudit.boundaryMoveUp`: Move Finding Up: `cmd + shift + numpad8`

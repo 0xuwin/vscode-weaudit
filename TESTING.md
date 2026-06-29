@@ -257,9 +257,9 @@ Native dialogs (file open, context menus, title bar menus) are **not automatable
 | `validateSerializedData` rejects `auditedFile` missing `path` | - | `undefined` path |
 | `validateSerializedData` rejects `auditedFile` missing `author` | - | `undefined` author |
 | `validateSerializedData` rejects `partiallyAuditedFile` missing coordinates | - | Missing `startLine`/`endLine` |
-| `validateSerializedData` rejects `entryDetails` missing `severity` | - | `undefined` severity |
-| `validateSerializedData` rejects `entryDetails` missing `difficulty` | - | `undefined` difficulty |
-| `validateSerializedData` rejects `entryDetails` missing `type` | - | `undefined` type |
+| `validateSerializedData` rejects `entryDetails` missing `severity` | - | Optional field, still valid |
+| `validateSerializedData` rejects `entryDetails` missing `difficulty` | - | Optional field, still valid |
+| `validateSerializedData` rejects `entryDetails` missing `type` | - | Optional field, still valid |
 
 ### types.ts - Type Guards
 
@@ -272,7 +272,7 @@ Native dialogs (file open, context menus, title bar menus) are **not automatable
 | `isLocationEntry` returns false for `FullEntry` | - | Missing `parentEntry` |
 | `isPathOrganizerEntry` returns true for path organizer | + | Has `pathLabel` field |
 | `isPathOrganizerEntry` returns false for entry | - | Missing `pathLabel` |
-| `isOldEntry` returns true for entry without `rootPath` | + | Legacy format |
+| `isOldEntry` returns true for entry without `rootPath` | + | External/SARIF import format |
 | `isOldEntry` returns false for entry with `rootPath` | - | New format |
 | `isConfigurationEntry` returns true for config | + | Has `username` field |
 | `isWorkspaceRootEntry` returns true for root | + | Has `label` field |
@@ -308,9 +308,8 @@ Native dialogs (file open, context menus, title bar menus) are **not automatable
 |------|------|-------------|
 | `createDefaultSerializedData` returns empty arrays | + | All arrays empty |
 | `createDefaultSerializedData` returns empty strings | + | All strings empty |
-| `createDefaultEntryDetails` returns undefined enums | + | Severity, difficulty, type |
-| `createDefaultEntryDetails` returns empty description | + | Empty string |
-| `createDefaultEntryDetails` returns recommendation template | + | Contains "Short term" |
+| `createDefaultEntryDetails` returns only title and description | + | No legacy fields |
+| `createDefaultEntryDetails` does not include severity/difficulty/type | + | Undefined |
 | `createPathOrganizer` creates valid path label | + | Returns `{pathLabel}` |
 | `createLocationEntry` ties location to parent | + | Returns linked structure |
 | `treeViewModeLabel` returns "list" for List mode | + | Enum to string |
@@ -343,7 +342,7 @@ Native dialogs (file open, context menus, title bar menus) are **not automatable
 |------|------|-------------|
 | `createOrEditEntry` creates new finding | + | EntryType.Finding, new label |
 | `createOrEditEntry` creates new note | + | EntryType.Note, new label |
-| `createOrEditEntry` edits existing entry label | + | Updates label in place |
+| `createOrEditEntry` reveals existing entry on intersection | + | Reveals entry for editing in Finding Details |
 | `createOrEditEntry` prompts for input | + | Shows input box |
 | `createOrEditEntry` cancels on empty input | - | Returns without change |
 | `createOrEditEntry` cancels on escape | - | Returns without change |
@@ -484,10 +483,7 @@ Native dialogs (file open, context menus, title bar menus) are **not automatable
 | `update-entry` updates field value | + | Field changed |
 | `update-entry` persists when `isPersistent` true | + | Saved to file |
 | `update-entry` skips persist when false | + | Not saved |
-| `update-repository-config` updates all fields | + | Client, audit, hash |
-| `choose-workspace-root` switches active root | + | Root changed |
 | `webview-ready` sends initial data | + | Entry details sent |
-| `set-workspace-roots` populates dropdown | + | Root labels sent |
 | Invalid message type ignored | - | No error |
 
 ### DecorationManager
@@ -569,8 +565,8 @@ test/extension/
 | Extension activates on workspace open | + | `onStartupFinished` trigger |
 | Extension activates on view open | + | `onView:weAudit` trigger |
 | Extension exports public API | + | `activate()` returns expected API |
-| Extension registers all commands | + | All 30+ commands available |
-| Extension creates tree views | + | All 5 views registered |
+| Extension registers all commands | + | All commands available |
+| Extension creates tree views | + | All views registered |
 | Extension handles missing `.vscode` folder | + | Creates folder on first save |
 | Extension handles corrupt `.weaudit` file | - | Graceful degradation, shows warning |
 
@@ -582,7 +578,7 @@ test/extension/
 | `weAudit.addFinding` prompts for label | + | Input box shown |
 | `weAudit.addFinding` cancels on escape | - | No entry created |
 | `weAudit.addNote` creates note at selection | + | Note entry added |
-| `weAudit.editEntryLabel` updates existing label | + | Label changed in tree |
+| `weAudit.editEntryLabel` updates existing label | - | Removed: use Finding Details panel |
 | `weAudit.deleteEntry` removes entry | + | Entry removed from tree |
 | `weAudit.deleteEntry` handles multi-location entry | + | All locations removed |
 | `weAudit.toggleAudited` marks file as reviewed | + | Decoration applied |
@@ -635,9 +631,7 @@ test/extension/
 | Finding details panel shows entry data | + | Fields populated |
 | Finding details panel updates on selection | + | Data changes |
 | Finding details panel saves changes | + | Persisted to file |
-| Git config panel opens | + | Webview visible |
-| Git config panel shows repository URLs | + | Fields populated |
-| Git config panel saves changes | + | Config updated |
+| Finding details panel shows fixed fields only for notes | + | No dynamic fields for notes |
 | Webview survives editor close/reopen | + | State preserved |
 
 ### Workspace Operations
@@ -668,7 +662,7 @@ test/extension/
 |------|------|-------------|
 | Invalid selection shows error message | - | User-friendly error |
 | Missing workspace shows warning | - | Prompts to open folder |
-| Git remote not configured shows warning | - | Guidance message |
+| Git remote not configured shows warning | - | Prompts to run Initialize Project Config |
 | Concurrent saves handled correctly | + | No data corruption |
 | Large file handling doesn't freeze UI | + | Responsive during operation |
 
