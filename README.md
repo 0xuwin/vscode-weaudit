@@ -41,6 +41,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Hide Findings**](#hide-findings) - Hide all findings associated with a specific user.
 -   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
 -   [**Export Findings**](#export-findings) - Export findings to a markdown file.
+-   [**External Finding Edits**](#external-finding-edits) - Keep the UI in sync when tools edit `.weaudit` files.
 -   [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
 -   [**Project Config**](#project-config) - Configure repositories, versions, and project metadata in `.vscode/info.json`.
 -   [**Finding Schema**](#finding-schema) - Customize finding detail fields, severity options, and tree labels.
@@ -181,6 +182,12 @@ You can search for and filter the findings in the `List of Findings` panel by ca
 
 ### Export Findings
 You can export the findings to a markdown file by calling the `weAudit: Export Findings as Markdown` command.
+
+### External Finding Edits
+
+weAudit watches `.vscode/*.weaudit` files for external edits. This lets LLM agents and other tools update saved finding JSON directly; when a watched file changes, weAudit reloads the currently visible finding files from disk and refreshes the tree, resolved findings, and editor highlights. You can also run `weAudit: Reload Findings from Disk` manually if a file watcher event is missed.
+
+When editing `.weaudit` files directly, note that line numbers are zero-based, `entryType` is `0` for findings and `1` for notes, and serialized location snippets use the `code_snippet` field name.
 
 ### Drag & Drop Findings and Locations
 You can drag and drop findings and locations in the _List of Findings_ panel to:
