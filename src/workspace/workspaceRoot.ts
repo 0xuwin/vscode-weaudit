@@ -21,10 +21,10 @@ import {
     mergeTwoPartiallyAuditedFileArrays,
 } from "../types";
 import { readAuditState, writeAuditState } from "../auditState/storage";
+import { markAuditStateFileAsSelfWritten } from "../auditState/writeTracker";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
-
 
 /**
  * Class representing a WeAudit workspace root. Each root maintains its own set of
@@ -698,6 +698,7 @@ export class WARoot {
                 partiallyAuditedFiles: filteredPartiallyAuditedEntries,
                 resolvedEntries: reducedResolvedEntries,
             };
+            markAuditStateFileAsSelfWritten(fileName);
             writeAuditState(fileName, serializedObj);
         }
     }

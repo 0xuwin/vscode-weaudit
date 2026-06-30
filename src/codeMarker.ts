@@ -47,9 +47,11 @@ import { renderFindingMarkdown } from "./markdown/findingMarkdown";
 import { DragAndDropController } from "./tree/dragAndDropController";
 import { WARoot } from "./workspace/workspaceRoot";
 import { MultiRootManager } from "./workspace/multiRootManager";
-
+import { isRecentlySelfWrittenAuditStateFile } from "./auditState/writeTracker";
 
 export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
+    private static readonly reloadAuditStateDebounceMs = 500;
+
     // treeEntries contains the currently active entries: findings and notes
     private treeEntries: FullEntry[];
 
@@ -82,6 +84,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     // State for navigating through partially audited regions
     private currentPartiallyAuditedIndex = -1;
+    private reloadAuditStateTimer: NodeJS.Timeout | undefined;
 
     constructor(context: vscode.ExtensionContext, decorationManager: DecorationManager) {
         this.treeEntries = [];
@@ -148,6 +151,22 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         registerInitializedCommand("weAudit.toggleFindingsHighlighting", () => {
             this.decorationsEnabled = !this.decorationsEnabled;
             this.decorate();
+        });
+
+        context.subscriptions.push(
+            vscode.commands.registerCommand("weAudit.reloadFindingsFromDisk", () => {
+                this.reloadFindingsFromDisk();
+            }),
+        );
+
+        this.registerAuditStateWatcher(context);
+        context.subscriptions.push({
+            dispose: () => {
+                if (this.reloadAuditStateTimer !== undefined) {
+                    clearTimeout(this.reloadAuditStateTimer);
+                    this.reloadAuditStateTimer = undefined;
+                }
+            },
         });
 
         registerInitializedCommand("weAudit.toggleTreeViewMode", () => {
@@ -422,6 +441,97 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         registerInitializedCommand("weAudit.getSelectedClientCodeAndPermalink", () => {
             return this.getSelectedClientCodeAndPermalink();
         });
+    }
+
+    /**
+     * Watches .weaudit files so external edits can be reflected in the tree and editor decorations.
+     */
+    private registerAuditStateWatcher(context: vscode.ExtensionContext): void {
+        const watcher = vscode.workspace.createFileSystemWatcher("**/.vscode/*.weaudit");
+        context.subscriptions.push(watcher);
+
+        watcher.onDidCreate((uri) => this.scheduleReloadFindingsFromDisk(uri, false), undefined, context.subscriptions);
+        watcher.onDidChange((uri) => this.scheduleReloadFindingsFromDisk(uri, false), undefined, context.subscriptions);
+        watcher.onDidDelete((uri) => this.scheduleReloadFindingsFromDisk(uri, true), undefined, context.subscriptions);
+    }
+
+    /**
+     * Debounces external .weaudit changes before reloading them from disk.
+     */
+    private scheduleReloadFindingsFromDisk(uri: vscode.Uri, isDelete: boolean): void {
+        if (!isDelete && isRecentlySelfWrittenAuditStateFile(uri.fsPath)) {
+            return;
+        }
+
+        if (this.reloadAuditStateTimer !== undefined) {
+            clearTimeout(this.reloadAuditStateTimer);
+        }
+
+        this.reloadAuditStateTimer = setTimeout(() => {
+            this.reloadAuditStateTimer = undefined;
+            this.reloadFindingsFromDisk();
+        }, CodeMarker.reloadAuditStateDebounceMs);
+    }
+
+    /**
+     * Reloads currently selected .weaudit files from disk and refreshes all visible UI state.
+     */
+    reloadFindingsFromDisk(): void {
+        const selectedConfigurations = [...this.workspaces.getSelectedConfigurations()];
+        for (const config of selectedConfigurations) {
+            if (!fs.existsSync(config.path)) {
+                this.unloadSavedDataFromConfig(config);
+                continue;
+            }
+
+            let parsedData: FullSerializedData | undefined;
+            try {
+                parsedData = this.loadSavedDataFromConfig(config, false, false);
+            } catch (error) {
+                vscode.window.showWarningMessage(`weAudit: Skipped reloading invalid audit state file ${config.path}: ${String(error)}`);
+                continue;
+            }
+            if (parsedData === undefined) {
+                vscode.window.showWarningMessage(`weAudit: Skipped reloading invalid audit state file ${config.path}.`);
+                continue;
+            }
+
+            this.unloadSavedDataFromConfig(config);
+            try {
+                this.loadSavedDataFromConfig(config, true, true);
+            } catch (error) {
+                vscode.window.showWarningMessage(`weAudit: Failed to reload audit state file ${config.path}: ${String(error)}`);
+            }
+        }
+
+        this.resolvedEntriesTree.setResolvedEntries(this.resolvedEntries);
+        this.refreshTree();
+        this.decorate();
+        vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+    }
+
+    /**
+     * Removes the in-memory state associated with a saved .weaudit configuration.
+     */
+    private unloadSavedDataFromConfig(config: ConfigurationEntry): void {
+        const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(config.path);
+        if (wsRoot === undefined) {
+            return;
+        }
+
+        this.treeEntries = this.treeEntries.filter(
+            (entry) =>
+                entry.author !== config.username ||
+                entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
+        );
+        wsRoot.filterAudited(config.username);
+        wsRoot.filterPartiallyAudited(config.username);
+        this.resolvedEntries = this.resolvedEntries.filter(
+            (entry) =>
+                entry.author !== config.username ||
+                entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
+        );
+        this.markPathMapDirty();
     }
 
     /**
@@ -1347,9 +1457,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 return;
             }
 
-            const details = entryType === EntryType.Finding
-                ? { ...createEntryDetailsFromSchema(loadFindingSchema()), title }
-                : { ...createDefaultEntryDetails(), title };
+            const details =
+                entryType === EntryType.Finding ? { ...createEntryDetailsFromSchema(loadFindingSchema()), title } : { ...createDefaultEntryDetails(), title };
 
             const entry: FullEntry = {
                 label: title,
@@ -1369,9 +1478,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     addNewEntryFromLocationEntry(locationEntry: FullLocationEntry): void {
         const newLabel = locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label;
-        const details = locationEntry.parentEntry.entryType === EntryType.Finding
-            ? { ...createEntryDetailsFromSchema(loadFindingSchema()), title: newLabel }
-            : { ...createDefaultEntryDetails(), title: newLabel };
+        const details =
+            locationEntry.parentEntry.entryType === EntryType.Finding
+                ? { ...createEntryDetailsFromSchema(loadFindingSchema()), title: newLabel }
+                : { ...createDefaultEntryDetails(), title: newLabel };
 
         const entry: FullEntry = {
             label: newLabel,

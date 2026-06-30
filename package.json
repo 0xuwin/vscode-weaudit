@@ -194,6 +194,10 @@
                 "title": "weAudit: Toggle Findings Highlighting"
             },
             {
+                "command": "weAudit.reloadFindingsFromDisk",
+                "title": "weAudit: Reload Findings from Disk"
+            },
+            {
                 "command": "weAudit.editFindingBoundary",
                 "title": "weAudit: Edit Finding Boundary"
             },
