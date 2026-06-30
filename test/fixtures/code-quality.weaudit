@@ -1,7 +1,5 @@
 {
-    "clientRemote": "https://github.com/client/project",
-    "gitRemote": "https://github.com/auditor/project-audit",
-    "gitSha": "abc123def456",
+    "schemaVersion": 1,
     "treeEntries": [
         {
             "label": "Unused return value",

@@ -1,0 +1,21 @@
+{
+    "schemaVersion": 1,
+    "project": {
+        "client": "Test Client",
+        "target": "sample-workspace",
+        "description": "Test workspace for extension tests"
+    },
+    "repositories": [
+        {
+            "name": "sample-workspace",
+            "root": ".",
+            "remote": "https://github.com/test/sample-workspace",
+            "versions": [
+                {
+                    "name": "Current",
+                    "commit": "abc123def456"
+                }
+            ]
+        }
+    ]
+}

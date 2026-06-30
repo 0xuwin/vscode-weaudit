@@ -39,7 +39,7 @@ function writeWeauditWithFinding(workspaceFolder: vscode.WorkspaceFolder, startL
                 entryType: 0,
                 author: vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username,
                 locations: [{ path: "src/sample.ts", startLine, endLine, label: "", code_snippet: "" }],
-                details: { title: "Test Finding", severity: "", difficulty: "", type: "", description: "", exploit: "", recommendation: "" },
+                details: { title: "Test Finding", description: "" },
             },
         ],
         auditedFiles: [],

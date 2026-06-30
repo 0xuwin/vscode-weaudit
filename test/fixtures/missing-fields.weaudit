@@ -1,7 +1,5 @@
 {
-    "clientRemote": "",
-    "gitRemote": "",
-    "gitSha": "",
+    "schemaVersion": 1,
     "treeEntries": [
         {
             "label": "Missing required fields",

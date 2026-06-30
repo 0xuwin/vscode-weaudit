@@ -8,7 +8,8 @@ interface SerializedEntry {
     label: string;
     entryType: number;
     author: string;
-    locations: Array<{ path: string; startLine: number; endLine: number }>;
+    details: { title: string; description: string };
+    locations: Array<{ path: string; startLine: number; endLine: number; code_snippet: string }>;
 }
 
 interface SerializedData {

@@ -5,7 +5,7 @@ import * as fs from "fs";
 import { userInfo } from "os";
 
 interface SerializedData {
-    treeEntries: Array<{ label: string; entryType: number }>;
+    treeEntries: Array<{ label: string; entryType: number; details: { title: string; description: string }; locations: Array<{ path: string; startLine: number; endLine: number; code_snippet: string }> }>;
     auditedFiles: Array<{ path: string; author: string }>;
     partiallyAuditedFiles: Array<{ path: string; author: string; startLine: number; endLine: number }>;
     resolvedEntries: Array<{ label: string }>;

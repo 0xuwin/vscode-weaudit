@@ -1,7 +1,5 @@
 {
-    "clientRemote": "https://github.com/client/legacy-project",
-    "gitRemote": "https://github.com/auditor/legacy-audit",
-    "gitSha": "legacy123",
+    "schemaVersion": 1,
     "treeEntries": [
         {
             "label": "Legacy finding",

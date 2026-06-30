@@ -57,12 +57,7 @@ suite("Performance", () => {
                 author: "testuser",
                 details: {
                     title: `Test Entry ${i}`,
-                    severity: "Undefined",
-                    difficulty: "Undefined",
-                    type: "Undefined",
                     description: "",
-                    exploit: "",
-                    recommendation: "",
                 },
                 locations: [
                     {
@@ -153,12 +148,7 @@ suite("Performance", () => {
                 author: "testuser",
                 details: {
                     title: `Large Test Entry ${i}`,
-                    severity: "Undefined",
-                    difficulty: "Undefined",
-                    type: "Undefined",
                     description: `Description for entry ${i}`,
-                    exploit: "",
-                    recommendation: "",
                 },
                 locations: [
                     {
