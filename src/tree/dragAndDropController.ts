@@ -1,14 +1,6 @@
 import * as vscode from "vscode";
 
-import {
-    TreeEntry,
-    TreeViewMode,
-    FullLocationEntry,
-    FullEntry,
-    isLocationEntry,
-    isEntry,
-    isPathOrganizerEntry,
-} from "../types";
+import { TreeEntry, TreeViewMode, FullLocationEntry, FullEntry, isLocationEntry, isEntry, isPathOrganizerEntry } from "../types";
 
 /** Subset of CodeMarker methods used by drag and drop operations. */
 export interface DragAndDropDataProvider {

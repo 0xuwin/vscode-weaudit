@@ -4,7 +4,6 @@ import * as path from "path";
 import { RootPathAndLabel, ConfigurationEntry, FullLocation, FullPath } from "../types";
 import { WARoot } from "./workspaceRoot";
 
-
 /**
  * This class helps manage a workspace with multiple root folders.
  * It maintains a list of root folders that it keeps up to date with user changes.
@@ -470,4 +469,3 @@ export class MultiRootManager {
         }
     }
 }
-

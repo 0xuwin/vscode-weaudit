@@ -62,9 +62,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
      */
     public setFindingDetails(entry: EntryDetails, entryType?: number): void {
         if (this._view) {
-            const schema = entryType === EntryType.Note
-                ? { fields: createFixedFindingSchemaFields() }
-                : loadFindingSchema();
+            const schema = entryType === EntryType.Note ? { fields: createFixedFindingSchemaFields() } : loadFindingSchema();
             this._view.webview.postMessage({
                 command: "set-finding-details",
                 details: entry,
